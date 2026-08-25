@@ -6,222 +6,137 @@
 <title>Mandelbrot — 無限のフラクタル</title>
 <style>
   :root {
-    --panel-bg: rgba(12, 12, 16, 0.72);
+    --panel-bg: rgba(12, 12, 16, 0.74);
     --panel-border: rgba(255, 255, 255, 0.09);
     --text-dim: rgba(255, 255, 255, 0.55);
     --text-bright: rgba(255, 255, 255, 0.95);
     --accent: #d9a441;
-    --warn: #e0743c;
   }
   * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
   html, body {
     margin: 0; padding: 0; width: 100%; height: 100%;
-    overflow: hidden;
-    background: #000;
-    font-family: 'Courier New', ui-monospace, 'SF Mono', Menlo, monospace;
-    touch-action: none;
-    user-select: none;
-    -webkit-user-select: none;
+    overflow: hidden; background: #000;
+    font-family: 'Courier New', ui-monospace, Menlo, monospace;
+    touch-action: none; user-select: none; -webkit-user-select: none;
   }
-  #glcanvas {
-    display: block;
-    width: 100vw;
-    height: 100vh;
-    touch-action: none;
-    cursor: grab;
-  }
+  #glcanvas { display: block; width: 100vw; height: 100vh; touch-action: none; cursor: grab; }
   #glcanvas.dragging { cursor: grabbing; }
 
   #hud {
-    position: fixed;
-    top: 14px; left: 14px;
-    padding: 10px 14px;
-    background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
+    position: fixed; top: 14px; left: 14px;
+    padding: 10px 13px;
+    background: var(--panel-bg); border: 1px solid var(--panel-border);
     border-radius: 10px;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    color: var(--text-dim);
-    font-size: 11px;
-    line-height: 1.65;
-    letter-spacing: 0.02em;
-    pointer-events: none;
-    max-width: 62vw;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    color: var(--text-dim); font-size: 10.5px; line-height: 1.6;
+    pointer-events: none; max-width: 68vw;
   }
-  #hud .row { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  #hud .label { color: var(--text-dim); opacity: 0.6; margin-right: 6px; }
-  #hud .val { color: var(--text-bright); font-variant-numeric: tabular-nums; }
+  #hud .val {
+    color: var(--text-bright); font-variant-numeric: tabular-nums;
+    word-break: break-all; font-size: 10px; line-height: 1.45;
+  }
+  #hud .label { opacity: 0.6; margin-right: 6px; }
   #hud .zoomval { color: var(--accent); font-weight: 600; }
-  #hud .limit { color: var(--warn); font-size: 10px; display: none; }
-  #hud .limit.show { display: block; }
+  #hud .stat { font-size: 9.5px; opacity: 0.45; margin-top: 3px; }
 
   #panelToggle {
-    position: fixed;
-    top: 14px; right: 14px;
+    position: fixed; top: 14px; right: 14px;
     width: 42px; height: 42px;
-    background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
+    background: var(--panel-bg); border: 1px solid var(--panel-border);
     border-radius: 10px;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
     display: flex; align-items: center; justify-content: center;
-    cursor: pointer;
-    z-index: 20;
+    cursor: pointer; z-index: 20;
   }
   #panelToggle svg { width: 20px; height: 20px; stroke: var(--text-bright); }
 
   #panel {
-    position: fixed;
-    top: 64px; right: 14px;
-    width: 240px;
-    background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
+    position: fixed; top: 64px; right: 14px; width: 244px;
+    background: var(--panel-bg); border: 1px solid var(--panel-border);
     border-radius: 12px;
-    backdrop-filter: blur(14px);
-    -webkit-backdrop-filter: blur(14px);
-    padding: 16px;
-    color: var(--text-bright);
-    font-size: 12px;
-    transform: translateX(280px);
-    opacity: 0;
-    transition: transform 0.25s cubic-bezier(.2,.8,.2,1), opacity 0.25s ease;
-    pointer-events: none;
-    z-index: 19;
-    max-height: calc(100vh - 90px);
-    overflow-y: auto;
+    backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    padding: 16px; color: var(--text-bright); font-size: 12px;
+    transform: translateX(290px); opacity: 0;
+    transition: transform .25s cubic-bezier(.2,.8,.2,1), opacity .25s ease;
+    pointer-events: none; z-index: 19;
+    max-height: calc(100vh - 92px); overflow-y: auto;
   }
   #panel.open { transform: translateX(0); opacity: 1; pointer-events: auto; }
   #panel h3 {
-    margin: 0 0 10px 0;
-    font-size: 10px;
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    font-weight: 600;
+    margin: 0 0 10px; font-size: 10px; letter-spacing: .12em;
+    text-transform: uppercase; color: var(--text-dim); font-weight: 600;
   }
   .section { margin-bottom: 16px; }
   .section:last-child { margin-bottom: 0; }
   .swatches { display: flex; gap: 8px; flex-wrap: wrap; }
   .swatch {
-    width: 34px; height: 34px;
-    border-radius: 8px;
-    cursor: pointer;
-    border: 2px solid transparent;
-    transition: transform 0.15s ease, border-color 0.15s ease;
+    width: 34px; height: 34px; border-radius: 8px; cursor: pointer;
+    border: 2px solid transparent; transition: transform .15s, border-color .15s;
   }
-  .swatch:active { transform: scale(0.92); }
+  .swatch:active { transform: scale(.92); }
   .swatch.active { border-color: var(--text-bright); }
   .bgrow { display: flex; gap: 8px; }
   .bgswatch {
-    flex: 1; height: 30px;
-    border-radius: 7px;
-    cursor: pointer;
-    border: 2px solid transparent;
-    display: flex; align-items: center; justify-content: center;
-    font-size: 10px;
-    transition: border-color 0.15s ease;
+    flex: 1; height: 30px; border-radius: 7px; cursor: pointer;
+    border: 2px solid transparent; display: flex;
+    align-items: center; justify-content: center; font-size: 10px;
   }
   .bgswatch.active { border-color: var(--accent); }
-  .field-row {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 8px;
-  }
+  .field-row { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
   .field-label { color: var(--text-dim); font-size: 11px; }
+  .field-val { color: var(--accent); font-size: 11px; min-width: 52px; text-align: right; }
   input[type=range] { width: 100%; accent-color: var(--accent); height: 4px; }
-  .field-val { color: var(--accent); font-size: 11px; min-width: 44px; text-align: right; }
   button.reset {
-    width: 100%;
-    padding: 9px;
-    margin-top: 4px;
-    background: rgba(255,255,255,0.06);
-    border: 1px solid var(--panel-border);
-    border-radius: 8px;
-    color: var(--text-bright);
-    font-size: 11px;
-    font-family: inherit;
-    cursor: pointer;
-    transition: background 0.15s ease;
+    width: 100%; padding: 9px; margin-top: 4px;
+    background: rgba(255,255,255,.06); border: 1px solid var(--panel-border);
+    border-radius: 8px; color: var(--text-bright); font-size: 11px;
+    font-family: inherit; cursor: pointer;
   }
-  button.reset:active { background: rgba(255,255,255,0.14); }
-  .note {
-    font-size: 10px;
-    color: var(--text-dim);
-    line-height: 1.5;
-    margin-top: 6px;
-  }
+  button.reset:active { background: rgba(255,255,255,.14); }
+  .note { font-size: 10px; color: var(--text-dim); line-height: 1.55; }
 
   #hint {
-    position: fixed;
-    bottom: 14px; left: 50%;
-    transform: translateX(-50%);
-    padding: 7px 16px;
-    background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
-    border-radius: 20px;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    color: var(--text-dim);
-    font-size: 10.5px;
-    pointer-events: none;
-    white-space: nowrap;
-    transition: opacity 0.6s ease;
-    z-index: 14;
+    position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%);
+    padding: 7px 16px; background: var(--panel-bg);
+    border: 1px solid var(--panel-border); border-radius: 20px;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    color: var(--text-dim); font-size: 10.5px; pointer-events: none;
+    white-space: nowrap; transition: opacity .6s ease; z-index: 14;
   }
   #hint.fade { opacity: 0; }
 
   #loading {
-    position: fixed;
-    top: 0; left: 0; width: 100%; height: 100%;
-    background: #000;
+    position: fixed; inset: 0; background: #000;
     display: flex; align-items: center; justify-content: center;
-    color: var(--text-dim);
-    font-size: 12px;
-    letter-spacing: 0.1em;
-    z-index: 100;
-    transition: opacity 0.4s ease;
-    text-align: center;
-    padding: 20px;
+    color: var(--text-dim); font-size: 12px; letter-spacing: .1em;
+    z-index: 100; transition: opacity .4s ease; text-align: center; padding: 20px;
   }
 
   #autoZoomBtn {
-    position: fixed;
-    bottom: 14px; right: 14px;
+    position: fixed; bottom: 14px; right: 14px;
     display: flex; align-items: center; gap: 7px;
-    padding: 10px 16px;
-    background: var(--panel-bg);
-    border: 1px solid var(--panel-border);
-    border-radius: 22px;
-    backdrop-filter: blur(10px);
-    -webkit-backdrop-filter: blur(10px);
-    color: var(--text-bright);
-    font-size: 11.5px;
-    cursor: pointer;
-    z-index: 15;
-    transition: background 0.2s ease, border-color 0.2s ease;
+    padding: 10px 16px; background: var(--panel-bg);
+    border: 1px solid var(--panel-border); border-radius: 22px;
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
+    color: var(--text-bright); font-size: 11.5px; cursor: pointer; z-index: 15;
+    transition: background .2s, border-color .2s;
   }
-  #autoZoomBtn svg {
-    width: 14px; height: 14px;
-    stroke: var(--text-bright);
-    fill: none;
-  }
-  #autoZoomBtn.active {
-    background: rgba(217, 164, 65, 0.22);
-    border-color: rgba(217, 164, 65, 0.55);
-  }
+  #autoZoomBtn svg { width: 14px; height: 14px; stroke: var(--text-bright); fill: none; }
+  #autoZoomBtn.active { background: rgba(217,164,65,.22); border-color: rgba(217,164,65,.55); }
   #autoZoomBtn.active svg { fill: var(--accent); stroke: var(--accent); }
 </style>
 </head>
 <body>
 
-<div id="loading">INITIALIZING GPU…</div>
+<div id="loading">INITIALIZING…</div>
 <canvas id="glcanvas"></canvas>
 
 <div id="hud">
-  <div class="row"><span class="label">中心座標</span></div>
-  <div class="row"><span class="val" id="hudRe">-0.5000000000</span></div>
-  <div class="row"><span class="val" id="hudIm">0.0000000000</span></div>
-  <div class="row" style="margin-top:4px;"><span class="label">拡大率</span><span class="val zoomval" id="hudZoom">1.00×</span></div>
-  <div class="limit" id="hudLimit">精度の限界に到達</div>
+  <div><span class="label">中心座標</span></div>
+  <div class="val" id="hudRe">-0.5</div>
+  <div class="val" id="hudIm">0.0</div>
+  <div style="margin-top:5px;"><span class="label">拡大率</span><span class="zoomval" id="hudZoom">1.00×</span></div>
+  <div class="stat" id="hudStat"></div>
 </div>
 
 <div id="panelToggle">
@@ -241,15 +156,17 @@
     </div>
   </div>
   <div class="section">
+    <h3>色の細かさ</h3>
+    <div class="field-row"><span class="field-label">配色の周期</span><span class="field-val" id="colorVal">標準</span></div>
+    <input type="range" id="colorSlider" min="0" max="4" step="1" value="2">
+  </div>
+  <div class="section">
     <h3>精細さ</h3>
-    <div class="field-row">
-      <span class="field-label">反復回数</span>
-      <span class="field-val" id="iterVal">標準</span>
-    </div>
+    <div class="field-row"><span class="field-label">反復回数</span><span class="field-val" id="iterVal">標準</span></div>
     <input type="range" id="iterSlider" min="0" max="4" step="1" value="2">
   </div>
   <div class="section">
-    <h3>演算精度</h3>
+    <h3>演算方式</h3>
     <div class="note" id="precisionNote">確認中…</div>
   </div>
   <div class="section">
@@ -266,769 +183,743 @@
 
 <script>
 (function() {
-  const canvas = document.getElementById('glcanvas');
-  const loading = document.getElementById('loading');
+'use strict';
 
-  // Prefer WebGL2: we need floatBitsToUint/uintBitsToFloat to build a
-  // split that the driver's optimizer cannot algebraically fold away.
-  let gl = canvas.getContext('webgl2', { antialias: false, alpha: false, depth: false, stencil: false });
-  let isGL2 = !!gl;
-  if (!gl) {
-    gl = canvas.getContext('webgl', { antialias: false, alpha: false, depth: false, stencil: false });
-  }
-  if (!gl) {
-    loading.textContent = 'このデバイスはWebGLに対応していません。';
-    return;
-  }
+const canvas = document.getElementById('glcanvas');
+const loading = document.getElementById('loading');
 
-  // =====================================================================
-  // Emulated double precision ("double-single": a float32 pair whose sum
-  // carries ~2x the mantissa bits of a single float32).
-  //
-  // The subtle part: the textbook Dekker/Veltkamp split writes the high
-  // half as `c = a*4097; hi = c - (c - a);`. That is only correct because
-  // of intermediate rounding — algebraically it simplifies to `a`. Mobile
-  // shader compilers (iOS routes WebGL through ANGLE -> Metal, which
-  // enables fast-math by default) perform exactly that simplification,
-  // silently collapsing the whole double-single scheme back to plain
-  // float32. That is what limited zoom to ~1e6 before.
-  //
-  // Masking the low mantissa bits instead is immune: the optimizer cannot
-  // reason algebraically across a bit-level reinterpretation, so the split
-  // survives. `opq()` plays the same role for the two-sum, which has the
-  // same "algebraically it's a no-op" shape.
-  // =====================================================================
-  const DS_GL2 = `
-  float opq(float x) { return uintBitsToFloat(floatBitsToUint(x)); }
-  float hiPart(float a) { return uintBitsToFloat(floatBitsToUint(a) & 0xfffff000u); }
+let gl = canvas.getContext('webgl2', { antialias:false, alpha:false, depth:false, stencil:false });
+const isGL2 = !!gl;
+if (!gl) gl = canvas.getContext('webgl', { antialias:false, alpha:false, depth:false, stencil:false });
+if (!gl) { loading.textContent = 'このデバイスはWebGLに対応していません。'; return; }
 
-  vec2 twoProd(float a, float b) {
-    float p = a * b;
-    float ah = hiPart(a); float al = a - ah;
-    float bh = hiPart(b); float bl = b - bh;
-    float e = ((ah * bh - p) + ah * bl + al * bh) + al * bl;
-    return vec2(p, e);
-  }
-  vec2 twoSum(float a, float b) {
-    float s = a + b;
-    float bb = opq(s - a);
-    float e = (a - opq(s - bb)) + (b - bb);
-    return vec2(s, e);
-  }`;
+// =====================================================================
+// Double-double arithmetic in JS (~32 significant digits).
+//
+// Only the view centre needs this. JS follows IEEE754 strictly, so the
+// classic Dekker split is safe here — unlike in GLSL, where the driver's
+// fast-math folds it away.
+// =====================================================================
+function twoSum(a, b) {
+  const s = a + b, bb = s - a;
+  return [s, (a - (s - bb)) + (b - bb)];
+}
+function splitD(a) {
+  const c = 134217729 * a, hi = c - (c - a);
+  return [hi, a - hi];
+}
+function twoProd(a, b) {
+  const p = a * b;
+  const [ah, al] = splitD(a), [bh, bl] = splitD(b);
+  return [p, ((ah * bh - p) + ah * bl + al * bh) + al * bl];
+}
+function ddAdd(a, b) {
+  const [s, e] = twoSum(a[0], b[0]);
+  const e2 = e + a[1] + b[1], hi = s + e2;
+  return [hi, e2 - (hi - s)];
+}
+function ddSub(a, b) { return ddAdd(a, [-b[0], -b[1]]); }
+function ddMul(a, b) {
+  const [p, e] = twoProd(a[0], b[0]);
+  const e2 = e + (a[0] * b[1] + a[1] * b[0]), hi = p + e2;
+  return [hi, e2 - (hi - p)];
+}
+const dd = (n) => [n, 0];
+const ddNum = (a) => a[0] + a[1];
 
-  // WebGL1 has no bit reinterpretation. Fall back to the multiply split;
-  // it is correct wherever the compiler respects IEEE rounding (desktop
-  // GL/D3D typically do) but cannot be guaranteed on mobile.
-  const DS_GL1 = `
-  float opq(float x) { return x; }
-  vec2 twoProd(float a, float b) {
-    float p = a * b;
-    const float SPLIT = 4097.0;
-    float ac = a * SPLIT; float ah = ac - (ac - a); float al = a - ah;
-    float bc = b * SPLIT; float bh = bc - (bc - b); float bl = b - bh;
-    float e = ((ah * bh - p) + ah * bl + al * bh) + al * bl;
-    return vec2(p, e);
-  }
-  vec2 twoSum(float a, float b) {
-    float s = a + b;
-    float bb = s - a;
-    float e = (a - (s - bb)) + (b - bb);
-    return vec2(s, e);
-  }`;
+// Render a double-double with more digits than a plain double can show —
+// the whole point of going deep is being able to read the coordinate back.
+function ddToFixed(a, digits) {
+  const S = 45;
+  const scaled = (x) => {
+    const s = x.toFixed(S);
+    const neg = s[0] === '-';
+    const body = neg ? s.slice(1) : s;
+    const dot = body.indexOf('.');
+    const v = BigInt(body.slice(0, dot) + body.slice(dot + 1));
+    return neg ? -v : v;
+  };
+  let total = scaled(a[0]) + scaled(a[1]);
+  const neg = total < 0n;
+  if (neg) total = -total;
+  total = total / (10n ** BigInt(S - digits));
+  let str = total.toString().padStart(digits + 1, '0');
+  const ip = str.slice(0, str.length - digits);
+  const fp = str.slice(str.length - digits);
+  return (neg ? '-' : '') + ip + '.' + fp;
+}
 
-  const DS_COMMON = `
-  vec2 dsAdd(vec2 a, vec2 b) {
-    vec2 s = twoSum(a.x, b.x);
-    float e = s.y + a.y + b.y;
-    float hi = s.x + e;
-    float lo = e - opq(hi - s.x);
-    return vec2(hi, lo);
-  }
-  vec2 dsMul(vec2 a, vec2 b) {
-    vec2 p = twoProd(a.x, b.x);
-    float e = p.y + (a.x * b.y + a.y * b.x);
-    float hi = p.x + e;
-    float lo = e - opq(hi - p.x);
-    return vec2(hi, lo);
-  }
-  vec2 dsSqr(vec2 a) {
-    vec2 p = twoProd(a.x, a.x);
-    float e = p.y + 2.0 * a.x * a.y;
-    float hi = p.x + e;
-    float lo = e - opq(hi - p.x);
-    return vec2(hi, lo);
-  }
-  vec2 dsNeg(vec2 a) { return vec2(-a.x, -a.y); }
-  vec2 dsFromFloat(float f) { return vec2(f, 0.0); }`;
-
-  const PALETTE_FN = `
-  vec3 palette(float t, int id) {
-    t = fract(t);
-    if (id == 0) {
-      return vec3(
-        0.5 + 0.5 * cos(6.2831 * (t + 0.00)),
-        0.5 + 0.5 * cos(6.2831 * (t + 0.33)),
-        0.5 + 0.5 * cos(6.2831 * (t + 0.67)));
-    } else if (id == 1) {
-      vec3 a = vec3(0.02, 0.01, 0.03);
-      vec3 b = vec3(1.00, 0.55, 0.10);
-      vec3 c = vec3(1.00, 0.90, 0.40);
-      return t < 0.5 ? mix(a, b, t / 0.5) : mix(b, c, (t - 0.5) / 0.5);
-    } else if (id == 2) {
-      vec3 a = vec3(0.01, 0.02, 0.08);
-      vec3 b = vec3(0.05, 0.35, 0.65);
-      vec3 c = vec3(0.75, 0.95, 1.00);
-      return t < 0.5 ? mix(a, b, t / 0.5) : mix(b, c, (t - 0.5) / 0.5);
-    } else if (id == 3) {
-      return mix(vec3(0.02), vec3(0.85, 0.65, 0.20), t);
-    } else {
-      vec3 a = vec3(0.03, 0.00, 0.08);
-      vec3 b = vec3(0.55, 0.15, 0.75);
-      vec3 c = vec3(1.00, 0.75, 0.90);
-      return t < 0.5 ? mix(a, b, t / 0.5) : mix(b, c, (t - 0.5) / 0.5);
-    }
-  }`;
-
-  const MANDEL_BODY = `
-  void main() {
-    vec2 uv = (vUv - 0.5) * 2.0;
-    uv.x *= uAspect;
-
-    vec2 cRe = dsAdd(uCenterRe, dsMul(uScale, dsFromFloat(uv.x)));
-    vec2 cIm = dsAdd(uCenterIm, dsMul(uScale, dsFromFloat(uv.y)));
-
-    vec2 zRe = cRe;
-    vec2 zIm = cIm;
-
-    float smoothIter = 0.0;
-    bool escaped = false;
-
-    for (int i = 0; i < 3000; i++) {
-      if (i >= uMaxIter) break;
-
-      vec2 zRe2 = dsSqr(zRe);
-      vec2 zIm2 = dsSqr(zIm);
-      float mag = zRe2.x + zIm2.x;
-
-      if (mag > 256.0) {
-        escaped = true;
-        smoothIter = float(i) - log2(log2(mag) * 0.5);
-        break;
-      }
-
-      vec2 zc = dsMul(zRe, zIm);
-      vec2 nRe = dsAdd(zRe2, dsNeg(zIm2));
-      vec2 nIm = dsAdd(zc, zc);
-
-      zRe = dsAdd(nRe, cRe);
-      zIm = dsAdd(nIm, cIm);
-    }
-
-    vec3 col;
-    if (!escaped) {
-      col = uBgMode == 0 ? vec3(0.0) : vec3(0.05, 0.04, 0.06);
-    } else {
-      col = palette(smoothIter * 0.014 + uColorPhase, uPaletteId);
-      col = pow(col, vec3(0.92));
-    }
-    OUT_COLOR = vec4(col, 1.0);
-  }`;
-
-  function buildMandelFragment() {
-    const dsImpl = isGL2 ? DS_GL2 : DS_GL1;
-    if (isGL2) {
-      return `#version 300 es
-precision highp float;
-precision highp int;
-in vec2 vUv;
-out vec4 fragColor;
-#define OUT_COLOR fragColor
-uniform float uAspect;
-uniform vec2 uCenterRe;
-uniform vec2 uCenterIm;
-uniform vec2 uScale;
-uniform int uMaxIter;
-uniform int uPaletteId;
-uniform int uBgMode;
-uniform float uColorPhase;
-${dsImpl}
-${DS_COMMON}
-${PALETTE_FN}
-${MANDEL_BODY}`;
-    }
-    return `precision highp float;
-varying vec2 vUv;
-#define OUT_COLOR gl_FragColor
-uniform float uAspect;
-uniform vec2 uCenterRe;
-uniform vec2 uCenterIm;
-uniform vec2 uScale;
-uniform int uMaxIter;
-uniform int uPaletteId;
-uniform int uBgMode;
-uniform float uColorPhase;
-${dsImpl}
-${DS_COMMON}
-${PALETTE_FN}
-${MANDEL_BODY}`;
-  }
-
-  function buildMandelVertex() {
-    if (isGL2) {
-      return `#version 300 es
+// =====================================================================
+// Shaders
+//
+// Perturbation path (WebGL2): one high-precision reference orbit Z_n is
+// computed on the CPU and uploaded as a texture. Each pixel then tracks
+// only its offset d from that orbit,
+//     d_{n+1} = 2*Z_n*d_n + d_n^2 + dc,
+// where dc = c - C is exactly representable no matter how far we zoom.
+// So per-pixel work stays in plain float32 at any depth — the depth limit
+// moves entirely onto the CPU-side reference, which is cheap to extend.
+//
+// "Rebasing" (Zhuoran's method): whenever the true orbit point z becomes
+// smaller than the offset d, the reference has stopped being informative
+// for this pixel, so we adopt z as the new offset and restart the
+// reference index. This is what removes the glitch blobs that older
+// perturbation renderers had to patch with multiple references.
+// =====================================================================
+const VS_GL2 = `#version 300 es
 in vec2 aPos;
 out vec2 vUv;
-void main() {
-  vUv = aPos * 0.5 + 0.5;
-  gl_Position = vec4(aPos, 0.0, 1.0);
-}`;
-    }
-    return `attribute vec2 aPos;
+void main() { vUv = aPos * 0.5 + 0.5; gl_Position = vec4(aPos, 0.0, 1.0); }`;
+
+const VS_GL1 = `attribute vec2 aPos;
 varying vec2 vUv;
-void main() {
-  vUv = aPos * 0.5 + 0.5;
-  gl_Position = vec4(aPos, 0.0, 1.0);
+void main() { vUv = aPos * 0.5 + 0.5; gl_Position = vec4(aPos, 0.0, 1.0); }`;
+
+const PALETTE_FN = `
+vec3 palette(float t, int id) {
+  t = fract(t);
+  if (id == 0) {
+    return vec3(0.5 + 0.5*cos(6.2831*(t+0.00)),
+                0.5 + 0.5*cos(6.2831*(t+0.33)),
+                0.5 + 0.5*cos(6.2831*(t+0.67)));
+  } else if (id == 1) {
+    vec3 a=vec3(0.02,0.01,0.03), b=vec3(1.0,0.55,0.10), c=vec3(1.0,0.90,0.40);
+    return t<0.5 ? mix(a,b,t/0.5) : mix(b,c,(t-0.5)/0.5);
+  } else if (id == 2) {
+    vec3 a=vec3(0.01,0.02,0.08), b=vec3(0.05,0.35,0.65), c=vec3(0.75,0.95,1.0);
+    return t<0.5 ? mix(a,b,t/0.5) : mix(b,c,(t-0.5)/0.5);
+  } else if (id == 3) {
+    return mix(vec3(0.02), vec3(0.85,0.65,0.20), t);
+  } else {
+    vec3 a=vec3(0.03,0.0,0.08), b=vec3(0.55,0.15,0.75), c=vec3(1.0,0.75,0.90);
+    return t<0.5 ? mix(a,b,t/0.5) : mix(b,c,(t-0.5)/0.5);
+  }
 }`;
+
+const FS_PERTURB = `#version 300 es
+precision highp float;
+precision highp int;
+precision highp sampler2D;
+
+in vec2 vUv;
+out vec4 fragColor;
+
+uniform sampler2D uRefTex;
+uniform float uAspect;
+uniform float uScale;
+uniform vec2  uDelta;      // view centre minus reference point
+uniform int   uMaxIter;
+uniform int   uRefLen;
+uniform int   uTexW;
+uniform int   uPaletteId;
+uniform int   uBgMode;
+uniform float uColorPhase;
+uniform float uColorRate;
+
+${PALETTE_FN}
+
+vec2 refAt(int i) {
+  return texelFetch(uRefTex, ivec2(i % uTexW, i / uTexW), 0).xy;
+}
+
+void main() {
+  vec2 uv = (vUv - 0.5) * 2.0;
+  uv.x *= uAspect;
+
+  vec2 dc = uDelta + uv * uScale;
+  vec2 d  = vec2(0.0);
+
+  int m = 0;
+  bool escaped = false;
+  float smoothIter = 0.0;
+
+  for (int n = 0; n < uMaxIter; n++) {
+    vec2 Z = refAt(m);
+    vec2 z = Z + d;
+    float zz = dot(z, z);
+
+    if (zz > 4.0) {
+      escaped = true;
+      smoothIter = float(n) + 1.0 - log2(max(log2(zz) * 0.5, 1e-8));
+      break;
+    }
+
+    // d = 2*Z*d + d^2 + dc   (complex arithmetic, all in float32:
+    // both Z and d stay O(1)-or-smaller regardless of zoom depth)
+    vec2 tZ = 2.0 * Z;
+    d = vec2(tZ.x*d.x - tZ.y*d.y + d.x*d.x - d.y*d.y,
+             tZ.x*d.y + tZ.y*d.x + 2.0*d.x*d.y) + dc;
+
+    m++;
+
+    // rebase when the reference stops being informative for this pixel
+    vec2 zn = refAt(m) + d;
+    if (dot(zn, zn) < dot(d, d) || m >= uRefLen) {
+      d = zn;
+      m = 0;
+    }
   }
 
-  // Blit program: upscales the half-resolution preview to the screen.
-  function buildBlitFragment() {
-    if (isGL2) {
-      return `#version 300 es
+  vec3 col;
+  if (!escaped) {
+    col = uBgMode == 0 ? vec3(0.0) : vec3(0.05, 0.04, 0.06);
+  } else {
+    // sqrt compresses the iteration axis so that deep regions, where
+    // neighbouring pixels can differ by tens of iterations, do not turn
+    // into rainbow speckle.
+    col = palette(sqrt(max(smoothIter, 0.0)) * uColorRate + uColorPhase, uPaletteId);
+    col = pow(col, vec3(0.92));
+  }
+  fragColor = vec4(col, 1.0);
+}`;
+
+// WebGL1 fallback: plain float32 direct iteration. Shallow, but it draws.
+const FS_DIRECT_GL1 = `precision highp float;
+varying vec2 vUv;
+uniform float uAspect;
+uniform float uScale;
+uniform vec2 uCenter;
+uniform int uMaxIter;
+uniform int uPaletteId;
+uniform int uBgMode;
+uniform float uColorPhase;
+uniform float uColorRate;
+${PALETTE_FN}
+void main() {
+  vec2 uv = (vUv - 0.5) * 2.0;
+  uv.x *= uAspect;
+  vec2 c = uCenter + uv * uScale;
+  vec2 z = c;
+  bool escaped = false;
+  float smoothIter = 0.0;
+  for (int n = 0; n < 2000; n++) {
+    if (n >= uMaxIter) break;
+    float x2 = z.x*z.x, y2 = z.y*z.y;
+    float zz = x2 + y2;
+    if (zz > 4.0) {
+      escaped = true;
+      smoothIter = float(n) + 1.0 - log2(max(log2(zz)*0.5, 1e-8));
+      break;
+    }
+    z = vec2(x2 - y2, 2.0*z.x*z.y) + c;
+  }
+  vec3 col;
+  if (!escaped) col = uBgMode == 0 ? vec3(0.0) : vec3(0.05,0.04,0.06);
+  else {
+    col = palette(sqrt(max(smoothIter,0.0)) * uColorRate + uColorPhase, uPaletteId);
+    col = pow(col, vec3(0.92));
+  }
+  gl_FragColor = vec4(col, 1.0);
+}`;
+
+const FS_BLIT_GL2 = `#version 300 es
 precision highp float;
 in vec2 vUv;
 out vec4 fragColor;
 uniform sampler2D uTex;
 void main() { fragColor = texture(uTex, vUv); }`;
-    }
-    return `precision highp float;
+
+const FS_BLIT_GL1 = `precision highp float;
 varying vec2 vUv;
 uniform sampler2D uTex;
 void main() { gl_FragColor = texture2D(uTex, vUv); }`;
-  }
 
-  function compileShader(type, src) {
-    const s = gl.createShader(type);
-    gl.shaderSource(s, src);
-    gl.compileShader(s);
-    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
-      const log = gl.getShaderInfoLog(s);
-      console.error(log, src);
-      throw new Error('Shader compile failed: ' + log);
-    }
-    return s;
+function compile(type, src) {
+  const s = gl.createShader(type);
+  gl.shaderSource(s, src);
+  gl.compileShader(s);
+  if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+    throw new Error(gl.getShaderInfoLog(s) || 'compile failed');
   }
-
-  function linkProgram(vsSrc, fsSrc) {
-    const p = gl.createProgram();
-    gl.attachShader(p, compileShader(gl.VERTEX_SHADER, vsSrc));
-    gl.attachShader(p, compileShader(gl.FRAGMENT_SHADER, fsSrc));
-    gl.bindAttribLocation(p, 0, 'aPos');
-    gl.linkProgram(p);
-    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
-      const log = gl.getProgramInfoLog(p);
-      console.error(log);
-      throw new Error('Program link failed: ' + log);
-    }
-    return p;
+  return s;
+}
+function link(vs, fs) {
+  const p = gl.createProgram();
+  gl.attachShader(p, compile(gl.VERTEX_SHADER, vs));
+  gl.attachShader(p, compile(gl.FRAGMENT_SHADER, fs));
+  gl.bindAttribLocation(p, 0, 'aPos');
+  gl.linkProgram(p);
+  if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+    throw new Error(gl.getProgramInfoLog(p) || 'link failed');
   }
+  return p;
+}
 
-  let mandelProg, blitProg;
-  try {
-    mandelProg = linkProgram(buildMandelVertex(), buildMandelFragment());
-    blitProg = linkProgram(buildMandelVertex(), buildBlitFragment());
-  } catch (err) {
-    loading.textContent = 'シェーダーの初期化に失敗しました: ' + err.message;
-    return;
+let mainProg, blitProg;
+try {
+  mainProg = isGL2 ? link(VS_GL2, FS_PERTURB) : link(VS_GL1, FS_DIRECT_GL1);
+  blitProg = isGL2 ? link(VS_GL2, FS_BLIT_GL2) : link(VS_GL1, FS_BLIT_GL1);
+} catch (err) {
+  loading.textContent = 'シェーダー初期化に失敗: ' + err.message;
+  return;
+}
+
+const quad = gl.createBuffer();
+gl.bindBuffer(gl.ARRAY_BUFFER, quad);
+gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([-1,-1, 1,-1, -1,1, -1,1, 1,-1, 1,1]), gl.STATIC_DRAW);
+
+const U = {};
+['uRefTex','uAspect','uScale','uDelta','uCenter','uMaxIter','uRefLen','uTexW',
+ 'uPaletteId','uBgMode','uColorPhase','uColorRate'].forEach(n => {
+  U[n] = gl.getUniformLocation(mainProg, n);
+});
+const uBlitTex = gl.getUniformLocation(blitProg, 'uTex');
+
+// ---- preview framebuffer ----
+const PREVIEW_SCALE = 0.45;
+const fbo = gl.createFramebuffer();
+const fboTex = gl.createTexture();
+let fboW = 0, fboH = 0;
+function ensureFbo(w, h) {
+  if (w === fboW && h === fboH) return;
+  fboW = w; fboH = h;
+  gl.bindTexture(gl.TEXTURE_2D, fboTex);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+  gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, fboTex, 0);
+  gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+}
+
+// =====================================================================
+// View state
+// =====================================================================
+let centerRe = dd(-0.5);
+let centerIm = dd(0.0);
+let scale = 1.6;
+
+// With perturbation the shader no longer limits depth; the floor is the
+// double-double centre (~32 digits) and, in practice, how many iterations
+// we can afford before it crawls.
+const MIN_SCALE = isGL2 ? 1e-29 : 2e-6;
+const MAX_SCALE = 4.0;
+
+let paletteId = 0, bgMode = 0, colorPhase = 0, iterBias = 0, colorBias = 0;
+
+function computeMaxIter() {
+  const depth = Math.log2(MAX_SCALE / Math.max(scale, MIN_SCALE));
+  let base = 220 + depth * 135;
+  base *= (1 + iterBias * 0.5);
+  return Math.min(isGL2 ? 11000 : 1800, Math.max(120, Math.round(base)));
+}
+function colorRate() { return 0.16 * Math.pow(1.5, -colorBias); }
+
+// =====================================================================
+// Reference orbit
+// =====================================================================
+const refTex = gl.createTexture();
+const REF_TEX_W = 1024;
+let refRe = null, refIm = null, refLen = 0, refCapacity = 0, refTexH = 0;
+
+function buildReference(maxIter) {
+  const cap = maxIter + 2;
+  const data = new Float32Array(REF_TEX_W * Math.ceil(cap / REF_TEX_W) * 2);
+  const cRe = centerRe, cIm = centerIm;
+  let zr = dd(0), zi = dd(0);
+  let n = 0;
+  for (; n < cap; n++) {
+    const xr = ddNum(zr), xi = ddNum(zi);
+    data[n * 2] = xr;
+    data[n * 2 + 1] = xi;
+    if (xr * xr + xi * xi > 4.0) { n++; break; }
+    const zr2 = ddMul(zr, zr), zi2 = ddMul(zi, zi), cross = ddMul(zr, zi);
+    const nzr = ddAdd(ddSub(zr2, zi2), cRe);
+    const nzi = ddAdd(ddAdd(cross, cross), cIm);
+    zr = nzr; zi = nzi;
   }
+  refLen = n;
+  refRe = cRe; refIm = cIm;
+  refCapacity = maxIter;
+  refTexH = Math.ceil(cap / REF_TEX_W);
 
-  // Full-screen quad
-  const quadBuf = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
-  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
-    -1, -1,  1, -1,  -1, 1,
-    -1,  1,  1, -1,   1, 1
-  ]), gl.STATIC_DRAW);
+  gl.bindTexture(gl.TEXTURE_2D, refTex);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  gl.texImage2D(gl.TEXTURE_2D, 0, gl.RG32F, REF_TEX_W, refTexH, 0, gl.RG, gl.FLOAT, data);
+}
+
+// A stale reference is still mathematically valid — dc just gets bigger —
+// so we only rebuild when it drifts out of view or runs short of orbit.
+function ensureReference(maxIter) {
+  if (!refRe) { buildReference(maxIter); return; }
+  if (maxIter > refCapacity) { buildReference(maxIter); return; }
+  const dx = ddNum(ddSub(centerRe, refRe));
+  const dy = ddNum(ddSub(centerIm, refIm));
+  if (Math.abs(dx) > scale * 0.9 || Math.abs(dy) > scale * 0.9) buildReference(maxIter);
+}
+
+// =====================================================================
+// Rendering
+// =====================================================================
+let renderQueued = false, wantPreview = false, refineTimer = null;
+let lastRefBuilds = 0;
+
+function scheduleRender(preview) {
+  if (preview) wantPreview = true;
+  if (!renderQueued) { renderQueued = true; requestAnimationFrame(doRender); }
+}
+
+function resizeIfNeeded() {
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = Math.floor(window.innerWidth * dpr), h = Math.floor(window.innerHeight * dpr);
+  if (canvas.width !== w || canvas.height !== h) { canvas.width = w; canvas.height = h; }
+}
+
+function setUniforms(maxIter) {
+  gl.useProgram(mainProg);
+  gl.uniform1f(U.uAspect, canvas.width / canvas.height);
+  gl.uniform1f(U.uScale, scale);
+  gl.uniform1i(U.uMaxIter, maxIter);
+  gl.uniform1i(U.uPaletteId, paletteId);
+  gl.uniform1i(U.uBgMode, bgMode);
+  gl.uniform1f(U.uColorPhase, colorPhase);
+  gl.uniform1f(U.uColorRate, colorRate());
+
+  if (isGL2) {
+    gl.uniform2f(U.uDelta, ddNum(ddSub(centerRe, refRe)), ddNum(ddSub(centerIm, refIm)));
+    gl.uniform1i(U.uRefLen, Math.max(1, refLen - 1));
+    gl.uniform1i(U.uTexW, REF_TEX_W);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, refTex);
+    gl.uniform1i(U.uRefTex, 0);
+  } else {
+    gl.uniform2f(U.uCenter, ddNum(centerRe), ddNum(centerIm));
+  }
+}
+
+function doRender() {
+  renderQueued = false;
+  resizeIfNeeded();
+  const preview = wantPreview;
+  wantPreview = false;
+
+  const maxIter = computeMaxIter();
+  if (isGL2) ensureReference(maxIter);
+
+  gl.bindBuffer(gl.ARRAY_BUFFER, quad);
   gl.enableVertexAttribArray(0);
   gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
-  const U = {
-    aspect: gl.getUniformLocation(mandelProg, 'uAspect'),
-    centerRe: gl.getUniformLocation(mandelProg, 'uCenterRe'),
-    centerIm: gl.getUniformLocation(mandelProg, 'uCenterIm'),
-    scale: gl.getUniformLocation(mandelProg, 'uScale'),
-    maxIter: gl.getUniformLocation(mandelProg, 'uMaxIter'),
-    paletteId: gl.getUniformLocation(mandelProg, 'uPaletteId'),
-    bgMode: gl.getUniformLocation(mandelProg, 'uBgMode'),
-    colorPhase: gl.getUniformLocation(mandelProg, 'uColorPhase'),
-  };
-  const uTexLoc = gl.getUniformLocation(blitProg, 'uTex');
-
-  // ---- Half-resolution framebuffer for the interactive preview pass ----
-  const PREVIEW_SCALE = 0.5;
-  let fbo = gl.createFramebuffer();
-  let fboTex = gl.createTexture();
-  let fboW = 0, fboH = 0;
-
-  function ensureFbo(w, h) {
-    if (w === fboW && h === fboH) return;
-    fboW = w; fboH = h;
-    gl.bindTexture(gl.TEXTURE_2D, fboTex);
-    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+  if (preview) {
+    const pw = Math.max(2, Math.floor(canvas.width * PREVIEW_SCALE));
+    const ph = Math.max(2, Math.floor(canvas.height * PREVIEW_SCALE));
+    ensureFbo(pw, ph);
     gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, fboTex, 0);
+    gl.viewport(0, 0, pw, ph);
+    // Same iteration count as the final pass — changing it between passes
+    // is what made pixels flip between black and coloured while moving.
+    setUniforms(maxIter);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
     gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    gl.useProgram(blitProg);
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, fboTex);
+    gl.uniform1i(uBlitTex, 0);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
+
+    clearTimeout(refineTimer);
+    refineTimer = setTimeout(() => { if (!autoZoomActive) scheduleRender(false); }, 110);
+  } else {
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+    gl.viewport(0, 0, canvas.width, canvas.height);
+    setUniforms(maxIter);
+    gl.drawArrays(gl.TRIANGLES, 0, 6);
   }
 
-  // =====================================================================
-  // View state. Center and scale are kept as JS doubles and split into
-  // float32 hi/lo pairs at upload time; the shader reassembles them.
-  // =====================================================================
-  let centerRe = -0.5;
-  let centerIm = 0.0;
-  let scale = 1.6;
+  updateHud(maxIter);
+}
 
-  // Double-single carries roughly 1e-14..1e-15 relative precision, which
-  // holds detail to about 1e11-1e12x zoom before adjacent pixels stop
-  // resolving. Verified numerically against exact double arithmetic.
-  const MIN_SCALE = isGL2 ? 1.5e-12 : 1.0e-10;
-  const MAX_SCALE = 4.0;
+const hudRe = document.getElementById('hudRe');
+const hudIm = document.getElementById('hudIm');
+const hudZoom = document.getElementById('hudZoom');
+const hudStat = document.getElementById('hudStat');
 
-  let paletteId = 0;
-  let bgMode = 0;
-  let colorPhase = 0.0;
-  let iterBias = 0;
+function updateHud(maxIter) {
+  const digits = Math.min(34, Math.max(6, Math.round(-Math.log10(scale)) + 4));
+  hudRe.textContent = ddToFixed(centerRe, digits);
+  hudIm.textContent = ddToFixed(centerIm, digits);
+  const zoom = 1.6 / scale;
+  hudZoom.textContent = zoom < 1000 ? zoom.toFixed(2) + '×'
+                                    : zoom.toExponential(2).replace('+', '') + '×';
+  hudStat.textContent = '反復 ' + maxIter + (isGL2 ? ' / 基準軌道 ' + refLen : '');
+}
 
-  function splitDouble(v) {
-    const hi = Math.fround(v);
-    return [hi, Math.fround(v - hi)];
+// =====================================================================
+// Interaction
+// =====================================================================
+let dragging = false, lastX = 0, lastY = 0;
+
+function panBy(dxPx, dyPx) {
+  const k = (2 * scale) / canvas.height;
+  centerRe = ddSub(centerRe, dd(dxPx * k));
+  centerIm = ddAdd(centerIm, dd(dyPx * k));
+}
+
+function zoomAt(px, py, factor) {
+  const w = canvas.width, h = canvas.height;
+  const nx = (px / w - 0.5) * 2 * (w / h);
+  const ny = -(py / h - 0.5) * 2;
+  const worldX = ddAdd(centerRe, dd(nx * scale));
+  const worldY = ddAdd(centerIm, dd(ny * scale));
+  scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale * factor));
+  centerRe = ddSub(worldX, dd(nx * scale));
+  centerIm = ddSub(worldY, dd(ny * scale));
+}
+
+const hideHint = () => document.getElementById('hint').classList.add('fade');
+
+canvas.addEventListener('mousedown', (e) => {
+  dragging = true; lastX = e.clientX; lastY = e.clientY;
+  canvas.classList.add('dragging');
+});
+window.addEventListener('mousemove', (e) => {
+  if (!dragging) return;
+  const dpr = canvas.width / window.innerWidth;
+  panBy((e.clientX - lastX) * dpr, (e.clientY - lastY) * dpr);
+  lastX = e.clientX; lastY = e.clientY;
+  hideHint(); scheduleRender(true);
+});
+window.addEventListener('mouseup', () => {
+  if (dragging) { dragging = false; canvas.classList.remove('dragging'); scheduleRender(false); }
+});
+canvas.addEventListener('wheel', (e) => {
+  e.preventDefault();
+  const dpr = canvas.width / window.innerWidth;
+  zoomAt(e.clientX * dpr, e.clientY * dpr, Math.exp(e.deltaY * 0.0016));
+  hideHint(); scheduleRender(true);
+}, { passive: false });
+
+let touch = null;
+canvas.addEventListener('touchstart', (e) => {
+  hideHint();
+  if (e.touches.length === 1) {
+    touch = { mode:'pan', x:e.touches[0].clientX, y:e.touches[0].clientY };
+  } else if (e.touches.length === 2) {
+    const [a, b] = e.touches;
+    touch = { mode:'pinch', dist: Math.hypot(b.clientX-a.clientX, b.clientY-a.clientY) };
   }
+  e.preventDefault();
+}, { passive: false });
 
-  function computeMaxIter() {
-    const depth = Math.log2(MAX_SCALE / Math.max(scale, MIN_SCALE));
-    let base = 150 + depth * 46;
-    base *= (1.0 + iterBias * 0.45);
-    return Math.min(3000, Math.max(90, Math.round(base)));
-  }
-
-  let renderQueued = false;
-  let wantPreview = false;
-  let refineTimer = null;
-
-  function scheduleRender(preview) {
-    if (preview) wantPreview = true;
-    if (!renderQueued) {
-      renderQueued = true;
-      requestAnimationFrame(doRender);
-    }
-  }
-
-  function resizeCanvasIfNeeded() {
-    const dpr = Math.min(window.devicePixelRatio || 1, 2);
-    const w = Math.floor(window.innerWidth * dpr);
-    const h = Math.floor(window.innerHeight * dpr);
-    if (canvas.width !== w || canvas.height !== h) {
-      canvas.width = w;
-      canvas.height = h;
-    }
-  }
-
-  function setMandelUniforms(preview) {
-    gl.useProgram(mandelProg);
-    const [reHi, reLo] = splitDouble(centerRe);
-    const [imHi, imLo] = splitDouble(centerIm);
-    const [scHi, scLo] = splitDouble(scale);
-    gl.uniform1f(U.aspect, canvas.width / canvas.height);
-    gl.uniform2f(U.centerRe, reHi, reLo);
-    gl.uniform2f(U.centerIm, imHi, imLo);
-    gl.uniform2f(U.scale, scHi, scLo);
-    const full = computeMaxIter();
-    // The preview trades resolution, not detail: keeping iterations high
-    // avoids the "solid black blobs" artefact where under-iterated pixels
-    // get misclassified as interior while the view is moving.
-    gl.uniform1i(U.maxIter, preview ? Math.max(90, Math.round(full * 0.75)) : full);
-    gl.uniform1i(U.paletteId, paletteId);
-    gl.uniform1i(U.bgMode, bgMode);
-    gl.uniform1f(U.colorPhase, colorPhase);
-  }
-
-  function doRender() {
-    renderQueued = false;
-    resizeCanvasIfNeeded();
-
-    const preview = wantPreview;
-    wantPreview = false;
-
-    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
-    gl.enableVertexAttribArray(0);
-    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
-
-    if (preview) {
-      const pw = Math.max(2, Math.floor(canvas.width * PREVIEW_SCALE));
-      const ph = Math.max(2, Math.floor(canvas.height * PREVIEW_SCALE));
-      ensureFbo(pw, ph);
-
-      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
-      gl.viewport(0, 0, pw, ph);
-      setMandelUniforms(true);
-      gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-      gl.viewport(0, 0, canvas.width, canvas.height);
-      gl.useProgram(blitProg);
-      gl.activeTexture(gl.TEXTURE0);
-      gl.bindTexture(gl.TEXTURE_2D, fboTex);
-      gl.uniform1i(uTexLoc, 0);
-      gl.drawArrays(gl.TRIANGLES, 0, 6);
-
-      // Settle into a crisp full-resolution pass once motion stops.
-      clearTimeout(refineTimer);
-      refineTimer = setTimeout(() => { if (!autoZoomActive) scheduleRender(false); }, 110);
-    } else {
-      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
-      gl.viewport(0, 0, canvas.width, canvas.height);
-      setMandelUniforms(false);
-      gl.drawArrays(gl.TRIANGLES, 0, 6);
-    }
-
-    updateHud();
-  }
-
-  const hudRe = document.getElementById('hudRe');
-  const hudIm = document.getElementById('hudIm');
-  const hudZoom = document.getElementById('hudZoom');
-  const hudLimit = document.getElementById('hudLimit');
-
-  function updateHud() {
-    const digits = Math.min(15, Math.max(6, Math.round(-Math.log10(scale)) + 3));
-    hudRe.textContent = centerRe.toFixed(digits);
-    hudIm.textContent = centerIm.toFixed(digits);
-    const zoom = 1.6 / scale;
-    hudZoom.textContent = zoom < 1000
-      ? zoom.toFixed(2) + '×'
-      : zoom.toExponential(2).replace('+', '') + '×';
-    hudLimit.classList.toggle('show', scale <= MIN_SCALE * 1.05);
-  }
-
-  // =====================================================================
-  // Interaction: drag to pan, wheel to zoom, pinch to zoom.
-  // Double-tap is deliberately not bound to zoom.
-  // =====================================================================
-  let isDragging = false;
-  let lastX = 0, lastY = 0;
-
-  function screenToComplexDelta(dxPx, dyPx) {
-    const factor = (2 * scale) / canvas.height;
-    return [dxPx * factor, -dyPx * factor];
-  }
-
-  function zoomAt(px, py, factor) {
-    const w = canvas.width, h = canvas.height;
-    const aspect = w / h;
-    const nx = (px / w - 0.5) * 2 * aspect;
-    const ny = -(py / h - 0.5) * 2;
-    const worldX = centerRe + nx * scale;
-    const worldY = centerIm + ny * scale;
-
-    scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale * factor));
-
-    centerRe = worldX - nx * scale;
-    centerIm = worldY - ny * scale;
-  }
-
-  function hideHint() {
-    document.getElementById('hint').classList.add('fade');
-  }
-
-  canvas.addEventListener('mousedown', (e) => {
-    isDragging = true;
-    lastX = e.clientX; lastY = e.clientY;
-    canvas.classList.add('dragging');
-  });
-  window.addEventListener('mousemove', (e) => {
-    if (!isDragging) return;
-    const dpr = canvas.width / window.innerWidth;
-    const [cdx, cdy] = screenToComplexDelta((e.clientX - lastX) * dpr, (e.clientY - lastY) * dpr);
-    lastX = e.clientX; lastY = e.clientY;
-    centerRe -= cdx;
-    centerIm -= cdy;
-    hideHint();
+canvas.addEventListener('touchmove', (e) => {
+  e.preventDefault();
+  if (!touch) return;
+  const dpr = canvas.width / window.innerWidth;
+  if (touch.mode === 'pan' && e.touches.length === 1) {
+    const t = e.touches[0];
+    panBy((t.clientX - touch.x) * dpr, (t.clientY - touch.y) * dpr);
+    touch.x = t.clientX; touch.y = t.clientY;
     scheduleRender(true);
-  });
-  window.addEventListener('mouseup', () => {
-    if (isDragging) {
-      isDragging = false;
-      canvas.classList.remove('dragging');
-      scheduleRender(false);
-    }
-  });
-
-  canvas.addEventListener('wheel', (e) => {
-    e.preventDefault();
-    const dpr = canvas.width / window.innerWidth;
-    zoomAt(e.clientX * dpr, e.clientY * dpr, Math.exp(e.deltaY * 0.0016));
-    hideHint();
+  } else if (touch.mode === 'pinch' && e.touches.length === 2) {
+    const [a, b] = e.touches;
+    const nd = Math.hypot(b.clientX-a.clientX, b.clientY-a.clientY);
+    zoomAt((a.clientX+b.clientX)/2 * dpr, (a.clientY+b.clientY)/2 * dpr, touch.dist / Math.max(nd, 1));
+    touch.dist = nd;
     scheduleRender(true);
-  }, { passive: false });
+  }
+}, { passive: false });
 
-  let touchState = null;
+canvas.addEventListener('touchend', (e) => {
+  if (e.touches.length === 0) { touch = null; scheduleRender(false); }
+  else if (e.touches.length === 1) {
+    touch = { mode:'pan', x:e.touches[0].clientX, y:e.touches[0].clientY };
+  }
+});
 
-  canvas.addEventListener('touchstart', (e) => {
-    hideHint();
-    if (e.touches.length === 1) {
-      touchState = { mode: 'pan', x: e.touches[0].clientX, y: e.touches[0].clientY };
-    } else if (e.touches.length === 2) {
-      const [t0, t1] = e.touches;
-      touchState = {
-        mode: 'pinch',
-        dist: Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY)
-      };
-    }
-    e.preventDefault();
-  }, { passive: false });
+document.addEventListener('gesturestart', (e) => e.preventDefault());
+document.addEventListener('dblclick', (e) => e.preventDefault());
+window.addEventListener('resize', () => scheduleRender(false));
 
-  canvas.addEventListener('touchmove', (e) => {
-    e.preventDefault();
-    if (!touchState) return;
-    const dpr = canvas.width / window.innerWidth;
-
-    if (touchState.mode === 'pan' && e.touches.length === 1) {
-      const t = e.touches[0];
-      const [cdx, cdy] = screenToComplexDelta((t.clientX - touchState.x) * dpr, (t.clientY - touchState.y) * dpr);
-      touchState.x = t.clientX;
-      touchState.y = t.clientY;
-      centerRe -= cdx;
-      centerIm -= cdy;
-      scheduleRender(true);
-    } else if (touchState.mode === 'pinch' && e.touches.length === 2) {
-      const [t0, t1] = e.touches;
-      const newDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
-      const cx = (t0.clientX + t1.clientX) / 2;
-      const cy = (t0.clientY + t1.clientY) / 2;
-      zoomAt(cx * dpr, cy * dpr, touchState.dist / Math.max(newDist, 1));
-      touchState.dist = newDist;
-      scheduleRender(true);
-    }
-  }, { passive: false });
-
-  canvas.addEventListener('touchend', (e) => {
-    if (e.touches.length === 0) {
-      touchState = null;
-      scheduleRender(false);
-    } else if (e.touches.length === 1) {
-      touchState = { mode: 'pan', x: e.touches[0].clientX, y: e.touches[0].clientY };
-    }
-  });
-
-  document.addEventListener('gesturestart', (e) => e.preventDefault());
-  document.addEventListener('dblclick', (e) => e.preventDefault());
-  window.addEventListener('resize', () => scheduleRender(false));
-
-  // =====================================================================
-  // UI
-  // =====================================================================
-  const PALETTES = [
-    { id: 0, name: '虹色', css: 'linear-gradient(135deg,#ff3b3b,#ffd93b,#3bff88,#3bb8ff,#a23bff)' },
-    { id: 1, name: '炎',   css: 'linear-gradient(135deg,#1a0800,#ff8c1a,#fff0a0)' },
-    { id: 2, name: '深海', css: 'linear-gradient(135deg,#020410,#0d59a6,#bff5ff)' },
-    { id: 3, name: '金',   css: 'linear-gradient(135deg,#111,#d9a441)' },
-    { id: 4, name: '紫夢', css: 'linear-gradient(135deg,#0a0014,#8c26bf,#ffc0e0)' },
-  ];
-
-  const swatchContainer = document.getElementById('paletteSwatches');
-  PALETTES.forEach((p, i) => {
-    const el = document.createElement('div');
-    el.className = 'swatch' + (i === 0 ? ' active' : '');
-    el.style.background = p.css;
-    el.title = p.name;
-    el.addEventListener('click', () => {
-      paletteId = p.id;
-      document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
-      el.classList.add('active');
-      scheduleRender(false);
-    });
-    swatchContainer.appendChild(el);
-  });
-
-  document.querySelectorAll('.bgswatch').forEach(el => {
-    el.addEventListener('click', () => {
-      bgMode = parseInt(el.dataset.bg, 10);
-      document.querySelectorAll('.bgswatch').forEach(s => s.classList.remove('active'));
-      el.classList.add('active');
-      scheduleRender(false);
-    });
-  });
-
-  const iterSlider = document.getElementById('iterSlider');
-  const iterVal = document.getElementById('iterVal');
-  const iterLabels = ['低', '標準-', '標準', '標準+', '高'];
-  iterSlider.addEventListener('input', () => {
-    const v = parseInt(iterSlider.value, 10);
-    iterBias = v - 2;
-    iterVal.textContent = iterLabels[v];
+// =====================================================================
+// UI
+// =====================================================================
+const PALETTES = [
+  { id:0, css:'linear-gradient(135deg,#ff3b3b,#ffd93b,#3bff88,#3bb8ff,#a23bff)' },
+  { id:1, css:'linear-gradient(135deg,#1a0800,#ff8c1a,#fff0a0)' },
+  { id:2, css:'linear-gradient(135deg,#020410,#0d59a6,#bff5ff)' },
+  { id:3, css:'linear-gradient(135deg,#111,#d9a441)' },
+  { id:4, css:'linear-gradient(135deg,#0a0014,#8c26bf,#ffc0e0)' },
+];
+const swatches = document.getElementById('paletteSwatches');
+PALETTES.forEach((p, i) => {
+  const el = document.createElement('div');
+  el.className = 'swatch' + (i === 0 ? ' active' : '');
+  el.style.background = p.css;
+  el.addEventListener('click', () => {
+    paletteId = p.id;
+    swatches.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+    el.classList.add('active');
     scheduleRender(false);
   });
+  swatches.appendChild(el);
+});
 
-  document.getElementById('precisionNote').textContent = isGL2
-    ? '擬似倍精度（ビット分割方式）で動作中。拡大率およそ1000億倍まで細部を保ちます。'
-    : 'WebGL2が使えないため簡易方式で動作中。端末によっては浅いところで粗くなります。';
-
-  document.getElementById('resetBtn').addEventListener('click', () => {
-    if (autoZoomActive) stopAutoZoom();
-    centerRe = -0.5;
-    centerIm = 0.0;
-    scale = 1.6;
+document.querySelectorAll('.bgswatch').forEach(el => {
+  el.addEventListener('click', () => {
+    bgMode = parseInt(el.dataset.bg, 10);
+    document.querySelectorAll('.bgswatch').forEach(s => s.classList.remove('active'));
+    el.classList.add('active');
     scheduleRender(false);
   });
+});
 
-  const panelToggle = document.getElementById('panelToggle');
-  const panel = document.getElementById('panel');
-  panelToggle.addEventListener('click', (e) => {
-    e.stopPropagation();
-    panel.classList.toggle('open');
-  });
-  document.addEventListener('click', (e) => {
-    if (panel.classList.contains('open') && !panel.contains(e.target) && !panelToggle.contains(e.target)) {
-      panel.classList.remove('open');
-    }
-  });
-
-  // =====================================================================
-  // Auto-zoom: steers toward boundary detail and keeps diving.
-  // =====================================================================
-  let autoZoomActive = false;
-  let autoZoomRAF = null;
-  let targetRe = centerRe, targetIm = centerIm;
-  let lastPickTime = 0;
-
-  function escapeIter(cRe, cIm, maxIter) {
-    let zr = 0, zi = 0;
-    for (let i = 0; i < maxIter; i++) {
-      const zr2 = zr * zr, zi2 = zi * zi;
-      if (zr2 + zi2 > 4.0) return i;
-      const nzi = 2 * zr * zi + cIm;
-      zr = zr2 - zi2 + cRe;
-      zi = nzi;
-    }
-    return -1;
-  }
-
-  // Sample the current view on the CPU (JS doubles are plenty here — this
-  // only picks where to head next, it never renders) and head for the
-  // richest boundary point: escapes late, but does escape.
-  function pickNextTarget() {
-    const gridN = 24;
-    const sampleMaxIter = Math.min(700, computeMaxIter());
-    const aspect = canvas.width / canvas.height;
-    let best = null, bestScore = -1;
-
-    for (let gy = 0; gy < gridN; gy++) {
-      for (let gx = 0; gx < gridN; gx++) {
-        const nx = ((gx + 0.5) / gridN - 0.5) * 2 * 0.7;
-        const ny = ((gy + 0.5) / gridN - 0.5) * 2 * 0.7;
-        const cRe = centerRe + nx * scale * aspect;
-        const cIm = centerIm + ny * scale;
-        const it = escapeIter(cRe, cIm, sampleMaxIter);
-        if (it < 0) continue;
-        if (it < sampleMaxIter * 0.3) continue;
-        const score = it + Math.random() * sampleMaxIter * 0.06;
-        if (score > bestScore) {
-          bestScore = score;
-          best = { re: cRe, im: cIm };
-        }
-      }
-    }
-    if (!best) {
-      best = {
-        re: centerRe + (Math.random() - 0.5) * scale * 0.3,
-        im: centerIm + (Math.random() - 0.5) * scale * 0.3
-      };
-    }
-    return best;
-  }
-
-  const AUTO_ZOOM_RATE = 0.988;
-  const RETARGET_THRESHOLD = MIN_SCALE * 30;
-
-  function autoZoomTick() {
-    if (!autoZoomActive) return;
-
-    centerRe += (targetRe - centerRe) * 0.02;
-    centerIm += (targetIm - centerIm) * 0.02;
-    scale *= AUTO_ZOOM_RATE;
-
-    if (scale < RETARGET_THRESHOLD) {
-      // Approaching the precision floor. Pull back out and hand off to a
-      // fresh point so the dive reads as continuous rather than stalling
-      // into mush.
-      scale = Math.min(MAX_SCALE * 0.02, scale * 5e5);
-      const next = pickNextTarget();
-      targetRe = next.re;
-      targetIm = next.im;
-      centerRe = next.re;
-      centerIm = next.im;
-      lastPickTime = performance.now();
-    } else if (performance.now() - lastPickTime > 4000) {
-      lastPickTime = performance.now();
-      const next = pickNextTarget();
-      targetRe = next.re;
-      targetIm = next.im;
-    }
-
-    scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale));
-    scheduleRender(true);
-    autoZoomRAF = requestAnimationFrame(autoZoomTick);
-  }
-
-  const autoZoomBtn = document.getElementById('autoZoomBtn');
-  const autoZoomIcon = document.getElementById('autoZoomIcon');
-  const autoZoomLabel = document.getElementById('autoZoomLabel');
-  const PLAY_PATH = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
-  const PAUSE_PATH = '<rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>';
-
-  function stopAutoZoom() {
-    autoZoomActive = false;
-    if (autoZoomRAF) cancelAnimationFrame(autoZoomRAF);
-    autoZoomBtn.classList.remove('active');
-    autoZoomIcon.innerHTML = PLAY_PATH;
-    autoZoomLabel.textContent = 'オートズーム';
-    scheduleRender(false);
-  }
-
-  function startAutoZoom() {
-    autoZoomActive = true;
-    lastPickTime = performance.now();
-    const next = pickNextTarget();
-    targetRe = next.re;
-    targetIm = next.im;
-    autoZoomBtn.classList.add('active');
-    autoZoomIcon.innerHTML = PAUSE_PATH;
-    autoZoomLabel.textContent = '停止';
-    hideHint();
-    autoZoomRAF = requestAnimationFrame(autoZoomTick);
-  }
-
-  autoZoomBtn.addEventListener('click', (e) => {
-    e.stopPropagation();
-    autoZoomActive ? stopAutoZoom() : startAutoZoom();
-  });
-
-  ['mousedown', 'wheel', 'touchstart'].forEach(evt => {
-    canvas.addEventListener(evt, () => { if (autoZoomActive) stopAutoZoom(); }, { passive: true });
-  });
-
-  // =====================================================================
-  // Boot
-  // =====================================================================
-  resizeCanvasIfNeeded();
-  loading.style.opacity = '0';
-  setTimeout(() => { loading.style.display = 'none'; }, 400);
+const iterLabels = ['低', '標準-', '標準', '標準+', '高'];
+const iterSlider = document.getElementById('iterSlider');
+const iterVal = document.getElementById('iterVal');
+iterSlider.addEventListener('input', () => {
+  const v = +iterSlider.value;
+  iterBias = v - 2;
+  iterVal.textContent = iterLabels[v];
   scheduleRender(false);
-  setTimeout(hideHint, 5000);
+});
+
+const colorLabels = ['とても細かい', '細かい', '標準', 'なめらか', 'とてもなめらか'];
+const colorSlider = document.getElementById('colorSlider');
+const colorVal = document.getElementById('colorVal');
+colorSlider.addEventListener('input', () => {
+  const v = +colorSlider.value;
+  colorBias = v - 2;
+  colorVal.textContent = colorLabels[v];
+  scheduleRender(false);
+});
+
+document.getElementById('precisionNote').textContent = isGL2
+  ? '摂動法（perturbation）で動作中。中心点だけを32桁精度で計算し、各画素はそこからのズレだけを追うため、極端に深いところまで模様が保たれます。'
+  : 'WebGL2が使えないため簡易方式で動作中。深い拡大はできません。';
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (autoZoomActive) stopAutoZoom();
+  centerRe = dd(-0.5); centerIm = dd(0.0); scale = 1.6;
+  refRe = null;
+  scheduleRender(false);
+});
+
+const panelToggle = document.getElementById('panelToggle');
+const panel = document.getElementById('panel');
+panelToggle.addEventListener('click', (e) => { e.stopPropagation(); panel.classList.toggle('open'); });
+document.addEventListener('click', (e) => {
+  if (panel.classList.contains('open') && !panel.contains(e.target) && !panelToggle.contains(e.target)) {
+    panel.classList.remove('open');
+  }
+});
+
+// =====================================================================
+// Auto-zoom
+// =====================================================================
+let autoZoomActive = false, autoZoomRAF = null;
+let targetRe = null, targetIm = null, lastPick = 0;
+
+function escapeIter(cRe, cIm, maxIter) {
+  let zr = 0, zi = 0;
+  for (let i = 0; i < maxIter; i++) {
+    const r2 = zr*zr, i2 = zi*zi;
+    if (r2 + i2 > 4) return i;
+    const nzi = 2*zr*zi + cIm;
+    zr = r2 - i2 + cRe;
+    zi = nzi;
+  }
+  return -1;
+}
+
+// Steer toward boundary structure. Sampling runs relative to the current
+// centre in plain doubles, which is fine: we only need to know which
+// DIRECTION is interesting, and offsets within one view are small.
+function pickTarget() {
+  const N = 22;
+  const cap = Math.min(900, computeMaxIter());
+  const aspect = canvas.width / canvas.height;
+  const baseRe = ddNum(centerRe), baseIm = ddNum(centerIm);
+  let best = null, bestScore = -1;
+  for (let gy = 0; gy < N; gy++) {
+    for (let gx = 0; gx < N; gx++) {
+      const nx = ((gx + 0.5)/N - 0.5) * 2 * 0.7;
+      const ny = ((gy + 0.5)/N - 0.5) * 2 * 0.7;
+      const ox = nx * scale * aspect, oy = ny * scale;
+      const it = escapeIter(baseRe + ox, baseIm + oy, cap);
+      if (it < 0 || it < cap * 0.3) continue;
+      const score = it + Math.random() * cap * 0.06;
+      if (score > bestScore) { bestScore = score; best = { ox, oy }; }
+    }
+  }
+  if (!best) best = { ox: (Math.random()-0.5)*scale*0.3, oy: (Math.random()-0.5)*scale*0.3 };
+  return { re: ddAdd(centerRe, dd(best.ox)), im: ddAdd(centerIm, dd(best.oy)) };
+}
+
+function autoZoomTick() {
+  if (!autoZoomActive) return;
+  centerRe = ddAdd(centerRe, dd(ddNum(ddSub(targetRe, centerRe)) * 0.02));
+  centerIm = ddAdd(centerIm, dd(ddNum(ddSub(targetIm, centerIm)) * 0.02));
+  scale *= 0.988;
+
+  if (scale < MIN_SCALE * 30) {
+    // Precision floor in sight: pull back out and hand off to a fresh
+    // point so the dive keeps reading as continuous.
+    scale = Math.min(MAX_SCALE * 0.02, scale * 1e12);
+    const t = pickTarget();
+    targetRe = t.re; targetIm = t.im;
+    centerRe = t.re; centerIm = t.im;
+    refRe = null;
+    lastPick = performance.now();
+  } else if (performance.now() - lastPick > 4000) {
+    lastPick = performance.now();
+    const t = pickTarget();
+    targetRe = t.re; targetIm = t.im;
+  }
+
+  scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale));
+  scheduleRender(true);
+  autoZoomRAF = requestAnimationFrame(autoZoomTick);
+}
+
+const azBtn = document.getElementById('autoZoomBtn');
+const azIcon = document.getElementById('autoZoomIcon');
+const azLabel = document.getElementById('autoZoomLabel');
+const PLAY = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
+const PAUSE = '<rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>';
+
+function stopAutoZoom() {
+  autoZoomActive = false;
+  if (autoZoomRAF) cancelAnimationFrame(autoZoomRAF);
+  azBtn.classList.remove('active');
+  azIcon.innerHTML = PLAY;
+  azLabel.textContent = 'オートズーム';
+  scheduleRender(false);
+}
+function startAutoZoom() {
+  autoZoomActive = true;
+  lastPick = performance.now();
+  const t = pickTarget();
+  targetRe = t.re; targetIm = t.im;
+  azBtn.classList.add('active');
+  azIcon.innerHTML = PAUSE;
+  azLabel.textContent = '停止';
+  hideHint();
+  autoZoomRAF = requestAnimationFrame(autoZoomTick);
+}
+azBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (autoZoomActive) stopAutoZoom(); else startAutoZoom();
+});
+['mousedown','wheel','touchstart'].forEach(ev => {
+  canvas.addEventListener(ev, () => { if (autoZoomActive) stopAutoZoom(); }, { passive: true });
+});
+
+// =====================================================================
+// Boot
+// =====================================================================
+resizeIfNeeded();
+loading.style.opacity = '0';
+setTimeout(() => { loading.style.display = 'none'; }, 400);
+scheduleRender(false);
+setTimeout(hideHint, 5000);
+
 })();
 </script>
 </body>

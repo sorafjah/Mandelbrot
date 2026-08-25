@@ -3,1645 +3,1032 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>マンデルブロ集合ビューア</title>
+<title>Mandelbrot — 無限のフラクタル</title>
 <style>
-  :root{
-    --bg:#0b0d12;
-    --panel:#161a22;
-    --panel-border:#2a3040;
-    --text:#e8ebf2;
-    --sub:#8b93a7;
-    --accent:#6ea8fe;
+  :root {
+    --panel-bg: rgba(12, 12, 16, 0.72);
+    --panel-border: rgba(255, 255, 255, 0.09);
+    --text-dim: rgba(255, 255, 255, 0.55);
+    --text-bright: rgba(255, 255, 255, 0.95);
+    --accent: #d9a441;
+    --warn: #e0743c;
   }
-  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
-  html,body{
-    margin:0;padding:0;width:100%;height:100%;overflow:hidden;
-    background:var(--bg);color:var(--text);
-    font-family:-apple-system,BlinkMacSystemFont,"Hiragino Sans","Yu Gothic",sans-serif;
-    touch-action:none;
+  * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body {
+    margin: 0; padding: 0; width: 100%; height: 100%;
+    overflow: hidden;
+    background: #000;
+    font-family: 'Courier New', ui-monospace, 'SF Mono', Menlo, monospace;
+    touch-action: none;
+    user-select: none;
+    -webkit-user-select: none;
   }
-  #app{position:fixed;inset:0;}
-  canvas{display:block;width:100%;height:100%;cursor:crosshair;}
+  #glcanvas {
+    display: block;
+    width: 100vw;
+    height: 100vh;
+    touch-action: none;
+    cursor: grab;
+  }
+  #glcanvas.dragging { cursor: grabbing; }
 
-  #selectionBox{
-    position:fixed;
-    border:1.5px solid var(--accent);
-    background:rgba(110,168,254,0.15);
-    pointer-events:none;
-    display:none;
-    z-index:5;
+  #hud {
+    position: fixed;
+    top: 14px; left: 14px;
+    padding: 10px 14px;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: var(--text-dim);
+    font-size: 11px;
+    line-height: 1.65;
+    letter-spacing: 0.02em;
+    pointer-events: none;
+    max-width: 62vw;
   }
+  #hud .row { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  #hud .label { color: var(--text-dim); opacity: 0.6; margin-right: 6px; }
+  #hud .val { color: var(--text-bright); font-variant-numeric: tabular-nums; }
+  #hud .zoomval { color: var(--accent); font-weight: 600; }
+  #hud .limit { color: var(--warn); font-size: 10px; display: none; }
+  #hud .limit.show { display: block; }
 
-  #hud{
-    position:fixed;top:14px;left:14px;
-    display:flex;flex-direction:column;gap:8px;
-    z-index:10;
-    max-width:min(320px, 42vw);
+  #panelToggle {
+    position: fixed;
+    top: 14px; right: 14px;
+    width: 42px; height: 42px;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    display: flex; align-items: center; justify-content: center;
+    cursor: pointer;
+    z-index: 20;
   }
-  .panel{
-    background:rgba(22,26,34,0.86);
-    backdrop-filter:blur(10px);
-    border:1px solid var(--panel-border);
-    border-radius:12px;
-    padding:10px 12px;
-    font-size:12.5px;
-    line-height:1.6;
-    color:var(--sub);
-  }
-  .panel b{color:var(--text);font-weight:600;}
-  #info-title{font-size:13.5px;color:var(--text);font-weight:700;margin-bottom:2px;}
-  #zoomVal{color:var(--accent);font-variant-numeric:tabular-nums;}
+  #panelToggle svg { width: 20px; height: 20px; stroke: var(--text-bright); }
 
-  #controls{
-    position:fixed;bottom:14px;left:50%;transform:translateX(-50%);
-    display:flex;gap:8px;align-items:center;
-    z-index:10;
-    background:rgba(22,26,34,0.86);
-    backdrop-filter:blur(10px);
-    border:1px solid var(--panel-border);
-    border-radius:14px;
-    padding:8px;
+  #panel {
+    position: fixed;
+    top: 64px; right: 14px;
+    width: 240px;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 12px;
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    padding: 16px;
+    color: var(--text-bright);
+    font-size: 12px;
+    transform: translateX(280px);
+    opacity: 0;
+    transition: transform 0.25s cubic-bezier(.2,.8,.2,1), opacity 0.25s ease;
+    pointer-events: none;
+    z-index: 19;
+    max-height: calc(100vh - 90px);
+    overflow-y: auto;
   }
-  .btn{
-    -webkit-user-select:none;user-select:none;
-    display:flex;align-items:center;justify-content:center;
-    width:44px;height:44px;
-    border-radius:10px;
-    background:#20242f;
-    border:1px solid var(--panel-border);
-    color:var(--text);
-    font-size:18px;
-    cursor:pointer;
-    transition:background .12s ease, transform .08s ease;
+  #panel.open { transform: translateX(0); opacity: 1; pointer-events: auto; }
+  #panel h3 {
+    margin: 0 0 10px 0;
+    font-size: 10px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--text-dim);
+    font-weight: 600;
   }
-  .btn:active{transform:scale(0.92);background:#2a3040;}
-  .btn.wide{width:auto;padding:0 16px;font-size:13px;gap:6px;white-space:nowrap;}
-  .btn svg{width:20px;height:20px;}
-
-  #paletteRow{display:flex;gap:6px;}
-  .swatch{
-    width:26px;height:26px;border-radius:6px;
-    border:2px solid transparent;
-    cursor:pointer;
-    flex-shrink:0;
+  .section { margin-bottom: 16px; }
+  .section:last-child { margin-bottom: 0; }
+  .swatches { display: flex; gap: 8px; flex-wrap: wrap; }
+  .swatch {
+    width: 34px; height: 34px;
+    border-radius: 8px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: transform 0.15s ease, border-color 0.15s ease;
   }
-  .swatch.active{border-color:var(--accent);}
-
-  #topRight{
-    position:fixed;top:14px;right:14px;z-index:10;
-    display:flex;gap:8px;
+  .swatch:active { transform: scale(0.92); }
+  .swatch.active { border-color: var(--text-bright); }
+  .bgrow { display: flex; gap: 8px; }
+  .bgswatch {
+    flex: 1; height: 30px;
+    border-radius: 7px;
+    cursor: pointer;
+    border: 2px solid transparent;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 10px;
+    transition: border-color 0.15s ease;
   }
-  #deepModeBtn.active{
-    background:var(--accent);
-    color:#0b0d12;
-    border-color:var(--accent);
-    font-weight:700;
+  .bgswatch.active { border-color: var(--accent); }
+  .field-row {
+    display: flex; align-items: center; justify-content: space-between;
+    margin-bottom: 8px;
   }
-  #deepStatus{
-    margin-top:4px;
-    padding-top:6px;
-    border-top:1px solid var(--panel-border);
-    font-size:11.5px;
+  .field-label { color: var(--text-dim); font-size: 11px; }
+  input[type=range] { width: 100%; accent-color: var(--accent); height: 4px; }
+  .field-val { color: var(--accent); font-size: 11px; min-width: 44px; text-align: right; }
+  button.reset {
+    width: 100%;
+    padding: 9px;
+    margin-top: 4px;
+    background: rgba(255,255,255,0.06);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    color: var(--text-bright);
+    font-size: 11px;
+    font-family: inherit;
+    cursor: pointer;
+    transition: background 0.15s ease;
   }
-  #deepStatus .row{display:flex;justify-content:space-between;gap:10px;}
-  #deepStatus .warn{color:#f2b134;}
-  #rebaseBtn{
-    margin-top:6px;width:100%;padding:6px;border-radius:8px;
-    background:#20242f;border:1px solid var(--panel-border);color:var(--text);
-    font-size:11.5px;cursor:pointer;
-  }
-  #rebaseBtn:active{background:#2a3040;}
-  #deepStatus .detailRow{display:flex;gap:4px;margin-top:3px;}
-  #deepStatus .detailBtn{
-    flex:1;padding:5px 2px;border-radius:7px;
-    background:#20242f;border:1px solid var(--panel-border);color:var(--sub);
-    font-size:11px;cursor:pointer;
-  }
-  #deepStatus .detailBtn.on{
-    background:var(--accent);color:#0b0d12;border-color:var(--accent);font-weight:700;
-  }
-  #computingOverlay{
-    position:fixed;top:14px;left:50%;transform:translateX(-50%);
-    background:rgba(22,26,34,0.92);
-    border:1px solid var(--panel-border);
-    border-radius:10px;
-    padding:8px 14px;
-    font-size:12.5px;
-    color:var(--accent);
-    z-index:20;
-    display:none;
-  }
-
-  #helpPanel{
-    position:fixed;
-    top:0;left:0;right:0;bottom:0;
-    background:rgba(5,6,9,0.72);
-    display:none;
-    align-items:center;justify-content:center;
-    z-index:50;
-    padding:20px;
-  }
-  #helpPanel.show{display:flex;}
-  #helpCard{
-    background:var(--panel);
-    border:1px solid var(--panel-border);
-    border-radius:16px;
-    padding:24px 26px;
-    max-width:420px;
-    width:100%;
-  }
-  #helpCard h2{margin:0 0 14px;font-size:17px;}
-  #helpCard ul{margin:0;padding-left:18px;font-size:13.5px;line-height:2;color:var(--sub);}
-  #helpCard ul b{color:var(--text);}
-  #helpClose{
-    margin-top:18px;width:100%;padding:11px;border-radius:10px;
-    background:var(--accent);color:#0b0d12;border:none;font-weight:700;font-size:14px;
-    cursor:pointer;
+  button.reset:active { background: rgba(255,255,255,0.14); }
+  .note {
+    font-size: 10px;
+    color: var(--text-dim);
+    line-height: 1.5;
+    margin-top: 6px;
   }
 
-  #loading{
-    position:fixed;inset:0;z-index:100;
-    background:var(--bg);
-    display:flex;align-items:center;justify-content:center;
-    color:var(--sub);font-size:14px;
+  #hint {
+    position: fixed;
+    bottom: 14px; left: 50%;
+    transform: translateX(-50%);
+    padding: 7px 16px;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 20px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: var(--text-dim);
+    font-size: 10.5px;
+    pointer-events: none;
+    white-space: nowrap;
+    transition: opacity 0.6s ease;
+    z-index: 14;
+  }
+  #hint.fade { opacity: 0; }
+
+  #loading {
+    position: fixed;
+    top: 0; left: 0; width: 100%; height: 100%;
+    background: #000;
+    display: flex; align-items: center; justify-content: center;
+    color: var(--text-dim);
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    z-index: 100;
+    transition: opacity 0.4s ease;
+    text-align: center;
+    padding: 20px;
   }
 
-  #coordsBadge{
-    font-family:ui-monospace,SFMono-Regular,Menlo,monospace;
-    font-size:11px;
-    word-break:break-all;
+  #autoZoomBtn {
+    position: fixed;
+    bottom: 14px; right: 14px;
+    display: flex; align-items: center; gap: 7px;
+    padding: 10px 16px;
+    background: var(--panel-bg);
+    border: 1px solid var(--panel-border);
+    border-radius: 22px;
+    backdrop-filter: blur(10px);
+    -webkit-backdrop-filter: blur(10px);
+    color: var(--text-bright);
+    font-size: 11.5px;
+    cursor: pointer;
+    z-index: 15;
+    transition: background 0.2s ease, border-color 0.2s ease;
   }
-
-  @media (max-width:640px){
-    #hud{max-width:min(260px,60vw);}
-    .panel{font-size:11.5px;padding:8px 10px;}
-    #info-title{font-size:12.5px;}
-    .btn{width:40px;height:40px;}
+  #autoZoomBtn svg {
+    width: 14px; height: 14px;
+    stroke: var(--text-bright);
+    fill: none;
   }
+  #autoZoomBtn.active {
+    background: rgba(217, 164, 65, 0.22);
+    border-color: rgba(217, 164, 65, 0.55);
+  }
+  #autoZoomBtn.active svg { fill: var(--accent); stroke: var(--accent); }
 </style>
 </head>
 <body>
-<div id="app">
-  <canvas id="glcanvas"></canvas>
-  <div id="selectionBox"></div>
 
-  <div id="hud">
-    <div class="panel">
-      <div id="info-title">マンデルブロ集合</div>
-      <div id="modeLabel">モード: 通常</div>
-      <div>倍率: <span id="zoomVal">1.00×</span></div>
-      <div id="coordsBadge"></div>
-      <div id="deepStatus" style="display:none;"></div>
-    </div>
-  </div>
+<div id="loading">INITIALIZING GPU…</div>
+<canvas id="glcanvas"></canvas>
 
-  <div id="topRight">
-    <div class="btn wide" id="deepModeBtn" title="深掘りモードに切り替え">🔬 深掘りモード</div>
-    <div class="btn" id="helpBtn" title="使い方">?</div>
-  </div>
-
-  <div id="controls">
-    <div class="btn" id="zoomOutBtn" title="縮小">−</div>
-    <div class="btn" id="zoomInBtn" title="拡大">＋</div>
-    <div class="btn wide" id="resetBtn" title="リセット">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-      リセット
-    </div>
-    <div id="paletteRow"></div>
-  </div>
-
-  <div id="helpPanel">
-    <div id="helpCard">
-      <h2>使い方</h2>
-      <ul>
-        <li><b>ドラッグ</b>：範囲を四角く選択してその部分に拡大</li>
-        <li><b>ピンチ</b>（iPad等）：2本指でつまんで拡大・縮小</li>
-        <li><b>ホイール／トラックパッド</b>：カーソル位置を中心に拡大・縮小</li>
-        <li><b>＋／−ボタン</b>：中心を基準に拡大・縮小</li>
-        <li><b>2本指ドラッグ</b>（iPad等）：画面を平行移動（パン）</li>
-        <li><b>Shift＋ドラッグ／右クリックドラッグ</b>（PC）：画面を平行移動（パン）</li>
-        <li><b>矢印キー</b>（PC）：画面を平行移動（パン）</li>
-        <li><b>リセット</b>：初期表示に戻る</li>
-      </ul>
-      <h2 style="margin-top:20px;">深掘りモード</h2>
-      <ul>
-        <li>通常モードは約<b>1兆倍</b>で画像が崩れます。その先へ進むためのモードです</li>
-        <li>気になる場所まで通常モードで拡大してから、右上の<b>🔬ボタン</b>で切り替えます</li>
-        <li>操作は通常モードと同じ。もう一度ボタンを押すと戻ります</li>
-        <li><b>黒と色の境目</b>を狙ってください。真っ黒な内部を掘っても何も出てきません</li>
-        <li>拡大のたびに高精度計算が走るため、少し待ち時間が出ます</li>
-        <li>黒くつぶれて見えるときは<b>精細さ</b>を上げてください（そのぶん重くなります）</li>
-        <li>上限は約<b>10<sup>30</sup>倍</b>です</li>
-      </ul>
-      <button id="helpClose">閉じる</button>
-    </div>
-  </div>
-
-  <div id="loading">読み込み中…</div>
-  <div id="computingOverlay">基準軌道を計算中…</div>
+<div id="hud">
+  <div class="row"><span class="label">中心座標</span></div>
+  <div class="row"><span class="val" id="hudRe">-0.5000000000</span></div>
+  <div class="row"><span class="val" id="hudIm">0.0000000000</span></div>
+  <div class="row" style="margin-top:4px;"><span class="label">拡大率</span><span class="val zoomval" id="hudZoom">1.00×</span></div>
+  <div class="limit" id="hudLimit">精度の限界に到達</div>
 </div>
 
+<div id="panelToggle">
+  <svg viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+</div>
+
+<div id="panel">
+  <div class="section">
+    <h3>カラーパレット</h3>
+    <div class="swatches" id="paletteSwatches"></div>
+  </div>
+  <div class="section">
+    <h3>背景</h3>
+    <div class="bgrow" id="bgSwatches">
+      <div class="bgswatch active" data-bg="0" style="background:#000;color:#888;">黒</div>
+      <div class="bgswatch" data-bg="1" style="background:#f4f1ea;color:#333;">明るい</div>
+    </div>
+  </div>
+  <div class="section">
+    <h3>精細さ</h3>
+    <div class="field-row">
+      <span class="field-label">反復回数</span>
+      <span class="field-val" id="iterVal">標準</span>
+    </div>
+    <input type="range" id="iterSlider" min="0" max="4" step="1" value="2">
+  </div>
+  <div class="section">
+    <h3>演算精度</h3>
+    <div class="note" id="precisionNote">確認中…</div>
+  </div>
+  <div class="section">
+    <button class="reset" id="resetBtn">初期表示に戻る</button>
+  </div>
+</div>
+
+<div id="autoZoomBtn">
+  <svg id="autoZoomIcon" viewBox="0 0 24 24" fill="none" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
+  <span id="autoZoomLabel">オートズーム</span>
+</div>
+
+<div id="hint">ドラッグで移動 ・ ホイール/ピンチでズーム</div>
+
 <script>
-(function(){
-"use strict";
+(function() {
+  const canvas = document.getElementById('glcanvas');
+  const loading = document.getElementById('loading');
 
-const canvas = document.getElementById('glcanvas');
-let gl2Available = true;
-let gl = canvas.getContext('webgl2', {antialias:false, preserveDrawingBuffer:false});
-if(!gl){
-  gl2Available = false;
-  gl = canvas.getContext('webgl', {antialias:false, preserveDrawingBuffer:false}) ||
-       canvas.getContext('experimental-webgl');
-}
-
-// Deep-dive mode requires float textures to upload the reference orbit; WebGL2 has
-// this natively (EXT_color_buffer_float for render targets isn't needed here, just
-// texture sampling of a float texture, which WebGL2 always supports). On WebGL1 we
-// try the OES_texture_float extension; if unavailable, deep-dive mode is disabled.
-let floatTextureSupported = gl2Available;
-let oesFloatExt = null;
-if(gl && !gl2Available){
-  oesFloatExt = gl.getExtension('OES_texture_float');
-  floatTextureSupported = !!oesFloatExt;
-}
-
-if(!gl){
-  document.getElementById('loading').textContent = 'このブラウザはWebGLに対応していません。';
-} else {
-  document.getElementById('loading').style.display = 'none';
-}
-
-// ---------- View state ----------
-// JS keeps cx/cy/scale as plain float64. Each is split into hi+lo float32 pairs
-// and sent to the GPU, where the ENTIRE Mandelbrot iteration runs in double-single
-// (Dekker) arithmetic — not just the initial coordinate. This is what actually
-// buys extra zoom depth: plain float32 iteration degrades to visible blocky
-// posterization by around 1e5x zoom, while full double-single iteration stays
-// clean out to roughly 1e13-1e14x before precision runs out.
-
-let state = {
-  cx: -0.5,
-  cy: 0.0,
-  scale: 3.0, // width of view in complex plane
-  paletteIndex: 0,
-  mode: 'normal' // 'normal' or 'deep'
-};
-const initialState = {cx:-0.5, cy:0.0, scale:3.0};
-
-// ---------- Deep-dive mode state ----------
-// In deep mode, cx/cy/scale above are NOT used for positioning (the reference
-// orbit anchors the center). Instead we track:
-//   deepCenter: BigFloat pair {x, y} — the exact reference point, arbitrary precision
-//   deepZoomExponent: log10 of how zoomed in we are relative to scale 3.0
-//   orbit: Float32Array packed as [hiX, loX, hiY, loY, ...] per iteration, sent as a texture
-//   orbitLen: how many iterations were actually computed before escape/cap
-const deep = {
-  center: null,       // {x: BigFloat, y: BigFloat}
-  zoomExponent: 0,     // scale = 3.0 * 10^(-zoomExponent)
-  orbit: null,          // Float32Array
-  orbitLen: 0,
-  orbitTex: null,
-  precision: 60,        // significant decimal digits carried by BigFloat
-  maxOrbitIter: 6000,
-  detailLevel: 1,       // index into DEEP_DETAIL_LEVELS
-  computing: false
-};
-
-// ---------- BigFloat: arbitrary-precision decimal, used only for the single
-// reference-orbit computation in deep-dive mode. Represented as
-// sign*mantissa(BigInt) * 10^exponent, rounded to `precision` significant digits
-// after every operation so BigInt magnitude stays bounded regardless of zoom depth.
-class BigFloat {
-  constructor(mantissa, exponent, precision){
-    this.m = mantissa;
-    this.e = exponent;
-    this.p = precision;
+  // Prefer WebGL2: we need floatBitsToUint/uintBitsToFloat to build a
+  // split that the driver's optimizer cannot algebraically fold away.
+  let gl = canvas.getContext('webgl2', { antialias: false, alpha: false, depth: false, stencil: false });
+  let isGL2 = !!gl;
+  if (!gl) {
+    gl = canvas.getContext('webgl', { antialias: false, alpha: false, depth: false, stencil: false });
   }
-  static fromNumber(x, precision){
-    if(x === 0) return new BigFloat(0n, 0, precision);
-    const neg = x < 0;
-    const s = Math.abs(x).toString();
-    let mantissaStr, exponent;
-    if(s.includes('e') || s.includes('E')){
-      // handle scientific notation like 1.23e-15
-      const [base, expStr] = s.split(/[eE]/);
-      const exp = parseInt(expStr, 10);
-      let [ip, fp] = base.split('.');
-      fp = fp || '';
-      mantissaStr = (ip + fp).replace(/^0+(?=\d)/, '');
-      exponent = exp - fp.length;
+  if (!gl) {
+    loading.textContent = 'このデバイスはWebGLに対応していません。';
+    return;
+  }
+
+  // =====================================================================
+  // Emulated double precision ("double-single": a float32 pair whose sum
+  // carries ~2x the mantissa bits of a single float32).
+  //
+  // The subtle part: the textbook Dekker/Veltkamp split writes the high
+  // half as `c = a*4097; hi = c - (c - a);`. That is only correct because
+  // of intermediate rounding — algebraically it simplifies to `a`. Mobile
+  // shader compilers (iOS routes WebGL through ANGLE -> Metal, which
+  // enables fast-math by default) perform exactly that simplification,
+  // silently collapsing the whole double-single scheme back to plain
+  // float32. That is what limited zoom to ~1e6 before.
+  //
+  // Masking the low mantissa bits instead is immune: the optimizer cannot
+  // reason algebraically across a bit-level reinterpretation, so the split
+  // survives. `opq()` plays the same role for the two-sum, which has the
+  // same "algebraically it's a no-op" shape.
+  // =====================================================================
+  const DS_GL2 = `
+  float opq(float x) { return uintBitsToFloat(floatBitsToUint(x)); }
+  float hiPart(float a) { return uintBitsToFloat(floatBitsToUint(a) & 0xfffff000u); }
+
+  vec2 twoProd(float a, float b) {
+    float p = a * b;
+    float ah = hiPart(a); float al = a - ah;
+    float bh = hiPart(b); float bl = b - bh;
+    float e = ((ah * bh - p) + ah * bl + al * bh) + al * bl;
+    return vec2(p, e);
+  }
+  vec2 twoSum(float a, float b) {
+    float s = a + b;
+    float bb = opq(s - a);
+    float e = (a - opq(s - bb)) + (b - bb);
+    return vec2(s, e);
+  }`;
+
+  // WebGL1 has no bit reinterpretation. Fall back to the multiply split;
+  // it is correct wherever the compiler respects IEEE rounding (desktop
+  // GL/D3D typically do) but cannot be guaranteed on mobile.
+  const DS_GL1 = `
+  float opq(float x) { return x; }
+  vec2 twoProd(float a, float b) {
+    float p = a * b;
+    const float SPLIT = 4097.0;
+    float ac = a * SPLIT; float ah = ac - (ac - a); float al = a - ah;
+    float bc = b * SPLIT; float bh = bc - (bc - b); float bl = b - bh;
+    float e = ((ah * bh - p) + ah * bl + al * bh) + al * bl;
+    return vec2(p, e);
+  }
+  vec2 twoSum(float a, float b) {
+    float s = a + b;
+    float bb = s - a;
+    float e = (a - (s - bb)) + (b - bb);
+    return vec2(s, e);
+  }`;
+
+  const DS_COMMON = `
+  vec2 dsAdd(vec2 a, vec2 b) {
+    vec2 s = twoSum(a.x, b.x);
+    float e = s.y + a.y + b.y;
+    float hi = s.x + e;
+    float lo = e - opq(hi - s.x);
+    return vec2(hi, lo);
+  }
+  vec2 dsMul(vec2 a, vec2 b) {
+    vec2 p = twoProd(a.x, b.x);
+    float e = p.y + (a.x * b.y + a.y * b.x);
+    float hi = p.x + e;
+    float lo = e - opq(hi - p.x);
+    return vec2(hi, lo);
+  }
+  vec2 dsSqr(vec2 a) {
+    vec2 p = twoProd(a.x, a.x);
+    float e = p.y + 2.0 * a.x * a.y;
+    float hi = p.x + e;
+    float lo = e - opq(hi - p.x);
+    return vec2(hi, lo);
+  }
+  vec2 dsNeg(vec2 a) { return vec2(-a.x, -a.y); }
+  vec2 dsFromFloat(float f) { return vec2(f, 0.0); }`;
+
+  const PALETTE_FN = `
+  vec3 palette(float t, int id) {
+    t = fract(t);
+    if (id == 0) {
+      return vec3(
+        0.5 + 0.5 * cos(6.2831 * (t + 0.00)),
+        0.5 + 0.5 * cos(6.2831 * (t + 0.33)),
+        0.5 + 0.5 * cos(6.2831 * (t + 0.67)));
+    } else if (id == 1) {
+      vec3 a = vec3(0.02, 0.01, 0.03);
+      vec3 b = vec3(1.00, 0.55, 0.10);
+      vec3 c = vec3(1.00, 0.90, 0.40);
+      return t < 0.5 ? mix(a, b, t / 0.5) : mix(b, c, (t - 0.5) / 0.5);
+    } else if (id == 2) {
+      vec3 a = vec3(0.01, 0.02, 0.08);
+      vec3 b = vec3(0.05, 0.35, 0.65);
+      vec3 c = vec3(0.75, 0.95, 1.00);
+      return t < 0.5 ? mix(a, b, t / 0.5) : mix(b, c, (t - 0.5) / 0.5);
+    } else if (id == 3) {
+      return mix(vec3(0.02), vec3(0.85, 0.65, 0.20), t);
     } else {
-      let [ip, fp] = s.split('.');
-      fp = fp || '';
-      mantissaStr = (ip + fp).replace(/^0+(?=\d)/, '') || '0';
-      exponent = -fp.length;
+      vec3 a = vec3(0.03, 0.00, 0.08);
+      vec3 b = vec3(0.55, 0.15, 0.75);
+      vec3 c = vec3(1.00, 0.75, 0.90);
+      return t < 0.5 ? mix(a, b, t / 0.5) : mix(b, c, (t - 0.5) / 0.5);
     }
-    let mantissa = BigInt(mantissaStr || '0');
-    if(neg) mantissa = -mantissa;
-    return new BigFloat(mantissa, exponent, precision).round();
-  }
-  static fromString(str, precision){
-    // Accepts plain decimal strings like "-1.401552580369198..." (no exponent notation needed,
-    // since the user types coordinates directly).
-    str = str.trim();
-    const neg = str.startsWith('-');
-    if(neg || str.startsWith('+')) str = str.slice(1);
-    let [ip, fp] = str.split('.');
-    ip = ip || '0';
-    fp = fp || '';
-    let mantissaStr = (ip + fp).replace(/^0+(?=\d)/, '') || '0';
-    let exponent = -fp.length;
-    let mantissa = BigInt(mantissaStr);
-    if(neg) mantissa = -mantissa;
-    return new BigFloat(mantissa, exponent, precision).round();
-  }
-  round(){
-    let m = this.m;
-    // Normalize zero. Without this the exponent of an exactly-zero value keeps
-    // drifting downward through mul/add (0e-30, then 0e-60, 0e-90...), and since
-    // add() aligns operands with 10n**BigInt(gap), a few thousand iterations
-    // produce a power of ten with six figures' worth of digits and the tab locks
-    // up. An exactly-zero imaginary part is the common case (any reference point
-    // on the real axis), so this is not a corner case.
-    if(m === 0n){ this.m = 0n; this.e = 0; return this; }
-    const neg = m < 0n;
-    if(neg) m = -m;
-    const d = m.toString().length;
-    if(d > this.p){
-      const drop = d - this.p;
-      const divisor = 10n ** BigInt(drop);
-      const half = divisor / 2n;
-      m = (m + half) / divisor;
-      this.e += drop;
-    }
-    this.m = neg ? -m : m;
-    return this;
-  }
-  add(other){
-    const a = this, b = other;
-    if(a.m === 0n) return new BigFloat(b.m, b.e, a.p).round();
-    if(b.m === 0n) return new BigFloat(a.m, a.e, a.p).round();
+  }`;
 
-    // If one operand is vastly smaller it cannot influence the p significant
-    // digits we keep, so return the dominant one instead of aligning them. This
-    // is what bounds the shift below: without it the exponent gap is unbounded
-    // and 10n**BigInt(gap) becomes ruinously expensive.
-    const magA = a.m.toString().length - (a.m < 0n ? 1 : 0) + a.e;
-    const magB = b.m.toString().length - (b.m < 0n ? 1 : 0) + b.e;
-    const guard = a.p + 10;
-    if(magA - magB > guard) return new BigFloat(a.m, a.e, a.p).round();
-    if(magB - magA > guard) return new BigFloat(b.m, b.e, a.p).round();
+  const MANDEL_BODY = `
+  void main() {
+    vec2 uv = (vUv - 0.5) * 2.0;
+    uv.x *= uAspect;
 
-    // Express both operands at the smaller (finer) exponent before adding, so the
-    // low-order digits of whichever operand is more precise aren't discarded.
-    const smallerE = a.e < b.e ? a.e : b.e;
-    const am = a.m * (10n ** BigInt(a.e - smallerE));
-    const bm = b.m * (10n ** BigInt(b.e - smallerE));
-    return new BigFloat(am + bm, smallerE, a.p).round();
-  }
-  sub(other){
-    return this.add(new BigFloat(-other.m, other.e, other.p));
-  }
-  mul(other){
-    return new BigFloat(this.m * other.m, this.e + other.e, this.p).round();
-  }
-  toNumber(){
-    // For values whose exponent is too extreme for Number, this saturates to 0/Infinity,
-    // which is fine — toHiLo() below is what's actually used for GPU upload.
-    return Number(this.m) * Math.pow(10, this.e);
-  }
-  // Split into a double-single (hi, lo) float32 pair for GPU upload, computed
-  // via string-based decimal-to-binary conversion so we don't lose precision
-  // by first collapsing through a JS double.
-  toHiLo(){
-    const full = this.toNumber();
-    const hi = Math.fround(full);
-    // recover the low part with extra decimal digits: (this - hi) as BigFloat
-    const hiBF = BigFloat.fromNumber(hi, this.p + 10);
-    const diff = this.sub(hiBF);
-    const lo = Math.fround(diff.toNumber());
-    return [hi, lo];
-  }
-  toDisplayString(digits){
-    digits = digits || 20;
-    let m = this.m;
-    const neg = m < 0n;
-    if(neg) m = -m;
-    let s = m.toString();
-    let e = this.e;
-    // build plain decimal string
-    if(e >= 0){
-      s = s + '0'.repeat(e);
-      return (neg?'-':'') + s;
-    } else {
-      const pointPos = s.length + e;
-      if(pointPos <= 0){
-        s = '0.' + '0'.repeat(-pointPos) + s;
-      } else {
-        s = s.slice(0, pointPos) + '.' + s.slice(pointPos);
+    vec2 cRe = dsAdd(uCenterRe, dsMul(uScale, dsFromFloat(uv.x)));
+    vec2 cIm = dsAdd(uCenterIm, dsMul(uScale, dsFromFloat(uv.y)));
+
+    vec2 zRe = cRe;
+    vec2 zIm = cIm;
+
+    float smoothIter = 0.0;
+    bool escaped = false;
+
+    for (int i = 0; i < 3000; i++) {
+      if (i >= uMaxIter) break;
+
+      vec2 zRe2 = dsSqr(zRe);
+      vec2 zIm2 = dsSqr(zIm);
+      float mag = zRe2.x + zIm2.x;
+
+      if (mag > 256.0) {
+        escaped = true;
+        smoothIter = float(i) - log2(log2(mag) * 0.5);
+        break;
       }
-      // trim to `digits` significant figures after leading zeros
-      return (neg?'-':'') + s;
+
+      vec2 zc = dsMul(zRe, zIm);
+      vec2 nRe = dsAdd(zRe2, dsNeg(zIm2));
+      vec2 nIm = dsAdd(zc, zc);
+
+      zRe = dsAdd(nRe, cRe);
+      zIm = dsAdd(nIm, cIm);
     }
-  }
-}
 
-let dpr = Math.min(window.devicePixelRatio || 1, 2.5);
-
-function effectiveDpr(){
-  // Deep mode costs orders of magnitude more per pixel, so it renders at a lower
-  // density than normal mode to stay responsive (see DEEP_RENDER_SCALE).
-  return state.mode === 'deep' ? Math.min(dpr, DEEP_RENDER_SCALE) : dpr;
-}
-
-function resize(){
-  const w = window.innerWidth, h = window.innerHeight;
-  const d = effectiveDpr();
-  canvas.width = Math.floor(w * d);
-  canvas.height = Math.floor(h * d);
-  canvas.style.width = w + 'px';
-  canvas.style.height = h + 'px';
-  if(gl) gl.viewport(0,0,canvas.width, canvas.height);
-}
-window.addEventListener('resize', resize);
-resize();
-
-// ---------- Shader ----------
-const vertSrc = `
-attribute vec2 aPos;
-void main(){
-  gl_Position = vec4(aPos, 0.0, 1.0);
-}
-`;
-
-// Fragment shader implements smooth-colored escape-time Mandelbrot.
-// The ENTIRE iteration (not just the initial coordinate) runs in double-single
-// (float-float / Dekker) emulated precision. This is the standard trick GPU
-// fractal viewers use to get ~30 significant decimal digits out of float32
-// hardware, which is what actually lets zoom go deep without blocky
-// posterization from precision loss.
-const fragSrc = `
-precision highp float;
-
-uniform vec2 uResolution;
-uniform vec2 uCenterHi;   // high part of center (x,y)
-uniform vec2 uCenterLo;   // low part (residual) of center (x,y)
-uniform float uScaleHi;   // view width in complex plane, split hi/lo
-uniform float uScaleLo;
-uniform float uAspect;
-uniform int uMaxIter;
-uniform int uPalette;
-uniform float uHueShift;
-
-// ---- double-single (Dekker/Knuth) arithmetic on (hi, lo) pairs ----
-vec2 ds_add(vec2 a, vec2 b){
-  float t1 = a.x + b.x;
-  float e = t1 - a.x;
-  float t2 = ((b.x - e) + (a.x - (t1 - e))) + a.y + b.y;
-  float hi = t1 + t2;
-  float lo = t2 - (hi - t1);
-  return vec2(hi, lo);
-}
-vec2 ds_sub(vec2 a, vec2 b){
-  return ds_add(a, vec2(-b.x, -b.y));
-}
-vec2 ds_mul(vec2 a, vec2 b){
-  float split = 4097.0;
-  float ca = split * a.x;
-  float a_hi = ca - (ca - a.x);
-  float a_lo = a.x - a_hi;
-  float cb = split * b.x;
-  float b_hi = cb - (cb - b.x);
-  float b_lo = b.x - b_hi;
-  float p = a_hi*b_hi;
-  float q = a_hi*b_lo + a_lo*b_hi;
-  float c = p + q;
-  float cc = c - p;
-  float e = ((p - (c - cc)) + (q - cc)) + a_lo*b_lo;
-  float t = a.x*b.y + a.y*b.x;
-  float hi = c + (e + t);
-  float lo = (e + t) - (hi - c);
-  return vec2(hi, lo);
-}
-vec2 ds_scale(vec2 a, float s){
-  return ds_mul(a, vec2(s, 0.0));
-}
-vec2 ds_fromFloat(float a){ return vec2(a, 0.0); }
-float ds_toFloat(vec2 a){ return a.x + a.y; }
-
-vec3 palette(float t, int scheme, float shift){
-  t = fract(t + shift);
-  if(scheme == 0){
-    vec3 a = vec3(0.5,0.5,0.5);
-    vec3 b = vec3(0.5,0.5,0.5);
-    vec3 c = vec3(1.0,1.0,1.0);
-    vec3 d = vec3(0.00,0.33,0.67);
-    return a + b*cos(6.28318*(c*t+d));
-  } else if(scheme == 1){
-    vec3 a = vec3(0.5,0.4,0.3);
-    vec3 b = vec3(0.5,0.4,0.3);
-    vec3 c = vec3(1.0,0.7,0.4);
-    vec3 d = vec3(0.0,0.15,0.2);
-    return a + b*cos(6.28318*(c*t+d));
-  } else if(scheme == 2){
-    vec3 a = vec3(0.4,0.5,0.6);
-    vec3 b = vec3(0.4,0.4,0.5);
-    vec3 c = vec3(0.8,0.9,1.0);
-    vec3 d = vec3(0.55,0.5,0.75);
-    return a + b*cos(6.28318*(c*t+d));
-  } else {
-    return vec3(t);
-  }
-}
-
-void main(){
-  vec2 uv = (gl_FragCoord.xy / uResolution.xy) - 0.5;
-  uv.x *= uAspect;
-
-  vec2 scaleDS = vec2(uScaleHi, uScaleLo);
-  // pixel offset in complex plane, computed in double-single precision
-  vec2 pxDS = ds_scale(scaleDS, uv.x);
-  vec2 pyDS = ds_scale(scaleDS, uv.y);
-
-  vec2 cX = ds_add(vec2(uCenterHi.x, uCenterLo.x), pxDS);
-  vec2 cY = ds_add(vec2(uCenterHi.y, uCenterLo.y), pyDS);
-
-  vec2 zx = cX;
-  vec2 zy = cY;
-
-  int iter = 0;
-  vec2 zx2 = ds_mul(zx, zx);
-  vec2 zy2 = ds_mul(zy, zy);
-
-  for(int i=0;i<3000;i++){
-    if(i >= uMaxIter) break;
-    if(ds_toFloat(zx2) + ds_toFloat(zy2) > 256.0) break;
-    vec2 xt = ds_add(ds_sub(zx2, zy2), cX);
-    vec2 xy = ds_mul(zx, zy);
-    zy = ds_add(ds_add(xy, xy), cY);
-    zx = xt;
-    zx2 = ds_mul(zx, zx);
-    zy2 = ds_mul(zy, zy);
-    iter++;
-  }
-
-  if(iter >= uMaxIter){
-    gl_FragColor = vec4(0.0,0.0,0.0,1.0);
-    return;
-  }
-
-  float mag = sqrt(ds_toFloat(zx2) + ds_toFloat(zy2));
-  float smoothIter = float(iter) + 1.0 - log(log(max(mag,1.0001)))/log(2.0);
-  float t = smoothIter * 0.014;
-  vec3 col = palette(t, uPalette, uHueShift);
-  gl_FragColor = vec4(col, 1.0);
-}
-`;
-
-// ---------------------------------------------------------------------------
-// Deep-dive mode: perturbation-theory shader.
-//
-// A single reference orbit Z_n (computed once, in arbitrary precision, on the
-// CPU) is uploaded as a float texture. Every pixel then only needs to track
-// its small deviation δ_n from that orbit:
-//     δ_(n+1) = 2·Z_n·δ_n + δ_n² + δc
-//     z_n = Z_n + δ_n
-// Because δc and δ_n stay tiny (they're offsets within one screen at the
-// current zoom level, not absolute coordinates), ordinary double-single
-// precision is more than enough for THIS part — the arbitrary precision is
-// spent once, up front, on Z_n only. This is what makes zoom depth
-// effectively unbounded: the GPU cost per frame never grows with zoom depth,
-// only the reference orbit's precision (a one-time CPU cost) does.
-const fragSrcDeep = `
-precision highp float;
-
-uniform vec2 uResolution;
-uniform float uAspect;
-uniform float uPixelScaleHi; // width of view in complex plane at current zoom, hi/lo
-uniform float uPixelScaleLo;
-uniform int uMaxIter;
-uniform int uOrbitLen;
-uniform int uOrbitTexWidth;
-uniform int uPalette;
-uniform sampler2D uOrbitTex; // RGBA: (Zx_hi, Zx_lo, Zy_hi, Zy_lo) per texel
-
-vec2 ds_add(vec2 a, vec2 b){
-  float t1 = a.x + b.x;
-  float e = t1 - a.x;
-  float t2 = ((b.x - e) + (a.x - (t1 - e))) + a.y + b.y;
-  float hi = t1 + t2;
-  float lo = t2 - (hi - t1);
-  return vec2(hi, lo);
-}
-vec2 ds_sub(vec2 a, vec2 b){ return ds_add(a, vec2(-b.x, -b.y)); }
-vec2 ds_mul(vec2 a, vec2 b){
-  float split = 4097.0;
-  float ca = split * a.x;
-  float a_hi = ca - (ca - a.x);
-  float a_lo = a.x - a_hi;
-  float cb = split * b.x;
-  float b_hi = cb - (cb - b.x);
-  float b_lo = b.x - b_hi;
-  float p = a_hi*b_hi;
-  float q = a_hi*b_lo + a_lo*b_hi;
-  float c = p + q;
-  float cc = c - p;
-  float e = ((p - (c - cc)) + (q - cc)) + a_lo*b_lo;
-  float t = a.x*b.y + a.y*b.x;
-  float hi = c + (e + t);
-  float lo = (e + t) - (hi - c);
-  return vec2(hi, lo);
-}
-vec2 ds_scale(vec2 a, float s){ return ds_mul(a, vec2(s, 0.0)); }
-float ds_toFloat(vec2 a){ return a.x + a.y; }
-
-vec3 palette(float t, int scheme){
-  t = fract(t);
-  if(scheme == 0){
-    vec3 a = vec3(0.5,0.5,0.5); vec3 b = vec3(0.5,0.5,0.5);
-    vec3 c = vec3(1.0,1.0,1.0); vec3 d = vec3(0.00,0.33,0.67);
-    return a + b*cos(6.28318*(c*t+d));
-  } else if(scheme == 1){
-    vec3 a = vec3(0.5,0.4,0.3); vec3 b = vec3(0.5,0.4,0.3);
-    vec3 c = vec3(1.0,0.7,0.4); vec3 d = vec3(0.0,0.15,0.2);
-    return a + b*cos(6.28318*(c*t+d));
-  } else if(scheme == 2){
-    vec3 a = vec3(0.4,0.5,0.6); vec3 b = vec3(0.4,0.4,0.5);
-    vec3 c = vec3(0.8,0.9,1.0); vec3 d = vec3(0.55,0.5,0.75);
-    return a + b*cos(6.28318*(c*t+d));
-  } else {
-    return vec3(t);
-  }
-}
-
-// Fetch Z_n (hi,lo for both x and y) from the orbit texture at iteration index n.
-void fetchOrbit(int n, out vec2 zxHiLo, out vec2 zyHiLo){
-  int w = uOrbitTexWidth;
-  int col = n - (n / w) * w;
-  int row = n / w;
-  vec2 texel = (vec2(float(col), float(row)) + 0.5) / float(w);
-  vec4 samp = texture2D(uOrbitTex, texel);
-  zxHiLo = vec2(samp.r, samp.g);
-  zyHiLo = vec2(samp.b, samp.a);
-}
-
-void main(){
-  vec2 uv = (gl_FragCoord.xy / uResolution.xy) - 0.5;
-  uv.x *= uAspect;
-
-  vec2 scaleDS = vec2(uPixelScaleHi, uPixelScaleLo);
-  vec2 dcX = ds_scale(scaleDS, uv.x);
-  vec2 dcY = ds_scale(scaleDS, uv.y);
-
-  vec2 dx = vec2(0.0, 0.0); // delta_n, starts at 0 (z_0 = Z_0 = 0)
-  vec2 dy = vec2(0.0, 0.0);
-
-  int iter = 0;
-  int n = 0;
-  float escapeMag = 0.0;
-
-  for(int i = 0; i < 20000; i++){
-    if(i >= uMaxIter || n >= uOrbitLen - 1) break;
-
-    vec2 ZxHL, ZyHL;
-    fetchOrbit(n, ZxHL, ZyHL);
-
-    // full z = Z_n + delta_n
-    float zxFull = ds_toFloat(ZxHL) + ds_toFloat(dx);
-    float zyFull = ds_toFloat(ZyHL) + ds_toFloat(dy);
-    float mag2 = zxFull*zxFull + zyFull*zyFull;
-    if(mag2 > 256.0){ escapeMag = sqrt(mag2); break; }
-
-    // delta_(n+1) = 2*Z_n*delta_n + delta_n^2 + dc
-    vec2 twoZxDx = ds_scale(ds_mul(ZxHL, dx), 2.0);
-    vec2 twoZyDy = ds_scale(ds_mul(ZyHL, dy), 2.0);
-    vec2 dx2 = ds_mul(dx, dx);
-    vec2 dy2 = ds_mul(dy, dy);
-    vec2 crossZxDy = ds_mul(ZxHL, dy);
-    vec2 crossZyDx = ds_mul(ZyHL, dx);
-    vec2 crossDxDy = ds_mul(dx, dy);
-
-    vec2 newDx = ds_add(ds_add(ds_sub(twoZxDx, twoZyDy), ds_sub(dx2, dy2)), dcX);
-    vec2 newDy = ds_add(ds_add(ds_add(ds_scale(crossZxDy,2.0), ds_scale(crossZyDx,2.0)), ds_scale(crossDxDy,2.0)), dcY);
-
-    dx = newDx;
-    dy = newDy;
-    iter++;
-    n++;
-  }
-
-  if(iter >= uMaxIter || n >= uOrbitLen - 1){
-    gl_FragColor = vec4(0.0,0.0,0.0,1.0);
-    return;
-  }
-
-  float smoothIter = float(iter) + 1.0 - log(log(max(escapeMag,1.0001)))/log(2.0);
-  float t = smoothIter * 0.014;
-  vec3 col = palette(t, uPalette);
-  gl_FragColor = vec4(col, 1.0);
-}
-`;
-
-function compile(type, src){
-  const sh = gl.createShader(type);
-  gl.shaderSource(sh, src);
-  gl.compileShader(sh);
-  if(!gl.getShaderParameter(sh, gl.COMPILE_STATUS)){
-    console.error(gl.getShaderInfoLog(sh));
-  }
-  return sh;
-}
-
-let program, uniforms = {};
-let programDeep, uniformsDeep = {};
-let quadBuf;
-if(gl){
-  program = gl.createProgram();
-  gl.attachShader(program, compile(gl.VERTEX_SHADER, vertSrc));
-  gl.attachShader(program, compile(gl.FRAGMENT_SHADER, fragSrc));
-  gl.linkProgram(program);
-  if(!gl.getProgramParameter(program, gl.LINK_STATUS)){
-    console.error(gl.getProgramInfoLog(program));
-  }
-
-  const quad = new Float32Array([-1,-1, 1,-1, -1,1, 1,1]);
-  quadBuf = gl.createBuffer();
-  gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
-  gl.bufferData(gl.ARRAY_BUFFER, quad, gl.STATIC_DRAW);
-
-  gl.useProgram(program);
-  const aPos = gl.getAttribLocation(program, 'aPos');
-  gl.enableVertexAttribArray(aPos);
-  gl.vertexAttribPointer(aPos, 2, gl.FLOAT, false, 0, 0);
-
-  uniforms.uResolution = gl.getUniformLocation(program, 'uResolution');
-  uniforms.uCenterHi = gl.getUniformLocation(program, 'uCenterHi');
-  uniforms.uCenterLo = gl.getUniformLocation(program, 'uCenterLo');
-  uniforms.uScaleHi = gl.getUniformLocation(program, 'uScaleHi');
-  uniforms.uScaleLo = gl.getUniformLocation(program, 'uScaleLo');
-  uniforms.uAspect = gl.getUniformLocation(program, 'uAspect');
-  uniforms.uMaxIter = gl.getUniformLocation(program, 'uMaxIter');
-  uniforms.uPalette = gl.getUniformLocation(program, 'uPalette');
-  uniforms.uHueShift = gl.getUniformLocation(program, 'uHueShift');
-
-  if(floatTextureSupported){
-    programDeep = gl.createProgram();
-    gl.attachShader(programDeep, compile(gl.VERTEX_SHADER, vertSrc));
-    gl.attachShader(programDeep, compile(gl.FRAGMENT_SHADER, fragSrcDeep));
-    gl.linkProgram(programDeep);
-    if(!gl.getProgramParameter(programDeep, gl.LINK_STATUS)){
-      console.error(gl.getProgramInfoLog(programDeep));
-      floatTextureSupported = false;
+    vec3 col;
+    if (!escaped) {
+      col = uBgMode == 0 ? vec3(0.0) : vec3(0.05, 0.04, 0.06);
     } else {
-      gl.useProgram(programDeep);
-      const aPosDeep = gl.getAttribLocation(programDeep, 'aPos');
-      gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
-      gl.enableVertexAttribArray(aPosDeep);
-      gl.vertexAttribPointer(aPosDeep, 2, gl.FLOAT, false, 0, 0);
+      col = palette(smoothIter * 0.014 + uColorPhase, uPaletteId);
+      col = pow(col, vec3(0.92));
+    }
+    OUT_COLOR = vec4(col, 1.0);
+  }`;
 
-      uniformsDeep.uResolution = gl.getUniformLocation(programDeep, 'uResolution');
-      uniformsDeep.uAspect = gl.getUniformLocation(programDeep, 'uAspect');
-      uniformsDeep.uPixelScaleHi = gl.getUniformLocation(programDeep, 'uPixelScaleHi');
-      uniformsDeep.uPixelScaleLo = gl.getUniformLocation(programDeep, 'uPixelScaleLo');
-      uniformsDeep.uMaxIter = gl.getUniformLocation(programDeep, 'uMaxIter');
-      uniformsDeep.uOrbitLen = gl.getUniformLocation(programDeep, 'uOrbitLen');
-      uniformsDeep.uOrbitTexWidth = gl.getUniformLocation(programDeep, 'uOrbitTexWidth');
-      uniformsDeep.uPalette = gl.getUniformLocation(programDeep, 'uPalette');
-      uniformsDeep.uOrbitTex = gl.getUniformLocation(programDeep, 'uOrbitTex');
+  function buildMandelFragment() {
+    const dsImpl = isGL2 ? DS_GL2 : DS_GL1;
+    if (isGL2) {
+      return `#version 300 es
+precision highp float;
+precision highp int;
+in vec2 vUv;
+out vec4 fragColor;
+#define OUT_COLOR fragColor
+uniform float uAspect;
+uniform vec2 uCenterRe;
+uniform vec2 uCenterIm;
+uniform vec2 uScale;
+uniform int uMaxIter;
+uniform int uPaletteId;
+uniform int uBgMode;
+uniform float uColorPhase;
+${dsImpl}
+${DS_COMMON}
+${PALETTE_FN}
+${MANDEL_BODY}`;
+    }
+    return `precision highp float;
+varying vec2 vUv;
+#define OUT_COLOR gl_FragColor
+uniform float uAspect;
+uniform vec2 uCenterRe;
+uniform vec2 uCenterIm;
+uniform vec2 uScale;
+uniform int uMaxIter;
+uniform int uPaletteId;
+uniform int uBgMode;
+uniform float uColorPhase;
+${dsImpl}
+${DS_COMMON}
+${PALETTE_FN}
+${MANDEL_BODY}`;
+  }
+
+  function buildMandelVertex() {
+    if (isGL2) {
+      return `#version 300 es
+in vec2 aPos;
+out vec2 vUv;
+void main() {
+  vUv = aPos * 0.5 + 0.5;
+  gl_Position = vec4(aPos, 0.0, 1.0);
+}`;
+    }
+    return `attribute vec2 aPos;
+varying vec2 vUv;
+void main() {
+  vUv = aPos * 0.5 + 0.5;
+  gl_Position = vec4(aPos, 0.0, 1.0);
+}`;
+  }
+
+  // Blit program: upscales the half-resolution preview to the screen.
+  function buildBlitFragment() {
+    if (isGL2) {
+      return `#version 300 es
+precision highp float;
+in vec2 vUv;
+out vec4 fragColor;
+uniform sampler2D uTex;
+void main() { fragColor = texture(uTex, vUv); }`;
+    }
+    return `precision highp float;
+varying vec2 vUv;
+uniform sampler2D uTex;
+void main() { gl_FragColor = texture2D(uTex, vUv); }`;
+  }
+
+  function compileShader(type, src) {
+    const s = gl.createShader(type);
+    gl.shaderSource(s, src);
+    gl.compileShader(s);
+    if (!gl.getShaderParameter(s, gl.COMPILE_STATUS)) {
+      const log = gl.getShaderInfoLog(s);
+      console.error(log, src);
+      throw new Error('Shader compile failed: ' + log);
+    }
+    return s;
+  }
+
+  function linkProgram(vsSrc, fsSrc) {
+    const p = gl.createProgram();
+    gl.attachShader(p, compileShader(gl.VERTEX_SHADER, vsSrc));
+    gl.attachShader(p, compileShader(gl.FRAGMENT_SHADER, fsSrc));
+    gl.bindAttribLocation(p, 0, 'aPos');
+    gl.linkProgram(p);
+    if (!gl.getProgramParameter(p, gl.LINK_STATUS)) {
+      const log = gl.getProgramInfoLog(p);
+      console.error(log);
+      throw new Error('Program link failed: ' + log);
+    }
+    return p;
+  }
+
+  let mandelProg, blitProg;
+  try {
+    mandelProg = linkProgram(buildMandelVertex(), buildMandelFragment());
+    blitProg = linkProgram(buildMandelVertex(), buildBlitFragment());
+  } catch (err) {
+    loading.textContent = 'シェーダーの初期化に失敗しました: ' + err.message;
+    return;
+  }
+
+  // Full-screen quad
+  const quadBuf = gl.createBuffer();
+  gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+  gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+    -1, -1,  1, -1,  -1, 1,
+    -1,  1,  1, -1,   1, 1
+  ]), gl.STATIC_DRAW);
+  gl.enableVertexAttribArray(0);
+  gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
+
+  const U = {
+    aspect: gl.getUniformLocation(mandelProg, 'uAspect'),
+    centerRe: gl.getUniformLocation(mandelProg, 'uCenterRe'),
+    centerIm: gl.getUniformLocation(mandelProg, 'uCenterIm'),
+    scale: gl.getUniformLocation(mandelProg, 'uScale'),
+    maxIter: gl.getUniformLocation(mandelProg, 'uMaxIter'),
+    paletteId: gl.getUniformLocation(mandelProg, 'uPaletteId'),
+    bgMode: gl.getUniformLocation(mandelProg, 'uBgMode'),
+    colorPhase: gl.getUniformLocation(mandelProg, 'uColorPhase'),
+  };
+  const uTexLoc = gl.getUniformLocation(blitProg, 'uTex');
+
+  // ---- Half-resolution framebuffer for the interactive preview pass ----
+  const PREVIEW_SCALE = 0.5;
+  let fbo = gl.createFramebuffer();
+  let fboTex = gl.createTexture();
+  let fboW = 0, fboH = 0;
+
+  function ensureFbo(w, h) {
+    if (w === fboW && h === fboH) return;
+    fboW = w; fboH = h;
+    gl.bindTexture(gl.TEXTURE_2D, fboTex);
+    gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, w, h, 0, gl.RGBA, gl.UNSIGNED_BYTE, null);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.LINEAR);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+    gl.framebufferTexture2D(gl.FRAMEBUFFER, gl.COLOR_ATTACHMENT0, gl.TEXTURE_2D, fboTex, 0);
+    gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+  }
+
+  // =====================================================================
+  // View state. Center and scale are kept as JS doubles and split into
+  // float32 hi/lo pairs at upload time; the shader reassembles them.
+  // =====================================================================
+  let centerRe = -0.5;
+  let centerIm = 0.0;
+  let scale = 1.6;
+
+  // Double-single carries roughly 1e-14..1e-15 relative precision, which
+  // holds detail to about 1e11-1e12x zoom before adjacent pixels stop
+  // resolving. Verified numerically against exact double arithmetic.
+  const MIN_SCALE = isGL2 ? 1.5e-12 : 1.0e-10;
+  const MAX_SCALE = 4.0;
+
+  let paletteId = 0;
+  let bgMode = 0;
+  let colorPhase = 0.0;
+  let iterBias = 0;
+
+  function splitDouble(v) {
+    const hi = Math.fround(v);
+    return [hi, Math.fround(v - hi)];
+  }
+
+  function computeMaxIter() {
+    const depth = Math.log2(MAX_SCALE / Math.max(scale, MIN_SCALE));
+    let base = 150 + depth * 46;
+    base *= (1.0 + iterBias * 0.45);
+    return Math.min(3000, Math.max(90, Math.round(base)));
+  }
+
+  let renderQueued = false;
+  let wantPreview = false;
+  let refineTimer = null;
+
+  function scheduleRender(preview) {
+    if (preview) wantPreview = true;
+    if (!renderQueued) {
+      renderQueued = true;
+      requestAnimationFrame(doRender);
     }
   }
-  gl.useProgram(program);
-}
 
-function splitDouble(x){
-  const hi = Math.fround(x);
-  const lo = x - hi;
-  return [hi, lo];
-}
-
-function maxIterForScale(scale){
-  // deeper zoom -> more iterations needed to resolve detail
-  const zoom = 3.0 / scale;
-  let it = 100 + Math.floor(90 * Math.log2(Math.max(zoom,1)));
-  return Math.min(Math.max(it, 100), 3000);
-}
-
-let rafPending = false;
-function requestRender(){
-  if(rafPending) return;
-  rafPending = true;
-  requestAnimationFrame(()=>{ rafPending = false; render(); });
-}
-
-function render(){
-  if(!gl) return;
-  gl.viewport(0,0,canvas.width, canvas.height);
-  gl.clearColor(0,0,0,1);
-  gl.clear(gl.COLOR_BUFFER_BIT);
-
-  if(state.mode === 'deep' && deep.orbit){
-    renderDeep();
-  } else {
-    renderNormal();
-  }
-
-  updateHUD();
-}
-
-function renderNormal(){
-  gl.useProgram(program);
-  gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
-
-  const [cxHi, cxLo] = splitDouble(state.cx);
-  const [cyHi, cyLo] = splitDouble(state.cy);
-  const [scaleHi, scaleLo] = splitDouble(state.scale);
-
-  gl.uniform2f(uniforms.uResolution, canvas.width, canvas.height);
-  gl.uniform2f(uniforms.uCenterHi, cxHi, cyHi);
-  gl.uniform2f(uniforms.uCenterLo, cxLo, cyLo);
-  gl.uniform1f(uniforms.uScaleHi, scaleHi);
-  gl.uniform1f(uniforms.uScaleLo, scaleLo);
-  gl.uniform1f(uniforms.uAspect, canvas.width / canvas.height);
-  gl.uniform1i(uniforms.uMaxIter, maxIterForScale(state.scale));
-  gl.uniform1i(uniforms.uPalette, state.paletteIndex);
-  gl.uniform1f(uniforms.uHueShift, 0.0);
-
-  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-}
-
-function renderDeep(){
-  gl.useProgram(programDeep);
-  gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
-
-  // pixelScale = width of view in complex plane at current deep zoom level =
-  // 3.0 * 10^(-zoomExponent), split hi/lo the same way as normal mode.
-  const pixelScale = 3.0 * Math.pow(10, -deep.zoomExponent);
-  const [scaleHi, scaleLo] = splitDouble(pixelScale);
-
-  gl.uniform2f(uniformsDeep.uResolution, canvas.width, canvas.height);
-  gl.uniform1f(uniformsDeep.uAspect, canvas.width / canvas.height);
-  gl.uniform1f(uniformsDeep.uPixelScaleHi, scaleHi);
-  gl.uniform1f(uniformsDeep.uPixelScaleLo, scaleLo);
-  gl.uniform1i(uniformsDeep.uMaxIter, Math.min(deep.orbitLen, deep.maxOrbitIter));
-  gl.uniform1i(uniformsDeep.uOrbitLen, deep.orbitLen);
-  gl.uniform1i(uniformsDeep.uOrbitTexWidth, deep.orbitTexWidth);
-  gl.uniform1i(uniformsDeep.uPalette, state.paletteIndex);
-
-  gl.activeTexture(gl.TEXTURE0);
-  gl.bindTexture(gl.TEXTURE_2D, deep.orbitTex);
-  gl.uniform1i(uniformsDeep.uOrbitTex, 0);
-
-  gl.drawArrays(gl.TRIANGLE_STRIP, 0, 4);
-}
-
-function updateHUD(){
-  const modeLabel = document.getElementById('modeLabel');
-  const zoomVal = document.getElementById('zoomVal');
-  const coordsBadge = document.getElementById('coordsBadge');
-
-  if(state.mode === 'deep' && deep.center){
-    modeLabel.textContent = 'モード: 深掘り';
-    zoomVal.textContent = formatZoom(Math.pow(10, deep.zoomExponent)) + '×';
-    coordsBadge.textContent =
-      'x: ' + deep.center.x.toDisplayString().slice(0, 24) + '\ny: ' + deep.center.y.toDisplayString().slice(0, 24);
-  } else {
-    modeLabel.textContent = 'モード: 通常';
-    const zoom = initialState.scale / state.scale;
-    zoomVal.textContent = formatZoom(zoom) + '×';
-    coordsBadge.textContent =
-      'x: ' + state.cx.toPrecision(8) + '\ny: ' + state.cy.toPrecision(8);
-  }
-}
-
-function formatZoom(z){
-  if(z < 1000) return z.toFixed(2);
-  if(z < 1e6) return (z/1e3).toFixed(2) + 'K';
-  if(z < 1e9) return (z/1e6).toFixed(2) + 'M';
-  if(z < 1e12) return (z/1e9).toFixed(2) + 'B';
-  if(z < 1e15) return (z/1e12).toFixed(2) + 'T';
-  if(z < 1e18) return (z/1e15).toFixed(2) + 'Qa';
-  if(z < 1e21) return (z/1e18).toFixed(2) + 'Qi';
-  if(z < 1e24) return (z/1e21).toFixed(2) + 'Sx';
-  return z.toExponential(2);
-}
-
-// ---------- Coordinate conversion ----------
-function screenToComplex(sx, sy){
-  const w = window.innerWidth, h = window.innerHeight;
-  const aspect = canvas.width / canvas.height;
-  let uvx = (sx / w) - 0.5;
-  let uvy = (sy / h) - 0.5;
-  uvx *= aspect;
-  const px = uvx * state.scale;
-  const py = uvy * state.scale;
-  return [state.cx + px, state.cy + py];
-}
-
-// ---------- Zoom operations ----------
-// With the full iteration loop now running in double-single precision on the GPU,
-// the effective mantissa is ~46 bits (vs float32's ~23), pushing the useful zoom
-// depth from ~1e5 up to roughly 1e13-1e14 before detail degrades. JS-side state
-// (float64, ~15-16 significant digits) is the next limiting factor, so we cap
-// just under that so panning/zoom math itself stays accurate.
-const MIN_SCALE = 1e-15;
-const MAX_SCALE = 6.0;
-
-function zoomAt(sx, sy, factor){
-  if(state.mode === 'deep'){
-    zoomAtDeep(sx, sy, factor);
-    return;
-  }
-  const [wx, wy] = screenToComplex(sx, sy);
-  let newScale = state.scale * factor;
-  newScale = Math.min(Math.max(newScale, MIN_SCALE), MAX_SCALE);
-  const actualFactor = newScale / state.scale;
-  state.cx = wx - (wx - state.cx) * actualFactor;
-  state.cy = wy - (wy - state.cy) * actualFactor;
-  state.scale = newScale;
-  requestRender();
-}
-
-function zoomAtCenter(factor){
-  zoomAt(window.innerWidth/2, window.innerHeight/2, factor);
-}
-
-function zoomToRect(x0,y0,x1,y1){
-  if(state.mode === 'deep'){
-    zoomToRectDeep(x0,y0,x1,y1);
-    return;
-  }
-  const cx0 = Math.min(x0,x1), cx1 = Math.max(x0,x1);
-  const cy0 = Math.min(y0,y1), cy1 = Math.max(y0,y1);
-  const w = cx1 - cx0, h = cy1 - cy0;
-  if(w < 4 || h < 4) return;
-
-  const midSx = (cx0+cx1)/2, midSy = (cy0+cy1)/2;
-  const [wx, wy] = screenToComplex(midSx, midSy);
-
-  const screenW = window.innerWidth, screenH = window.innerHeight;
-  const fracW = w / screenW;
-  const fracH = h / screenH;
-  const aspect = canvas.width / canvas.height;
-  // state.scale represents the complex-plane width of the full screen (x-axis).
-  // Convert the selection's width and height fractions to comparable scale
-  // candidates, then pick the larger so the whole selection fits on screen.
-  const scaleFromW = fracW * state.scale;
-  const scaleFromH = fracH * (state.scale / aspect);
-  let newScale = Math.max(scaleFromW, scaleFromH);
-  newScale = Math.min(Math.max(newScale, MIN_SCALE), MAX_SCALE);
-
-  state.cx = wx;
-  state.cy = wy;
-  state.scale = newScale;
-  requestRender();
-}
-
-function panBy(dxScreen, dyScreen){
-  if(state.mode === 'deep'){
-    panByDeep(dxScreen, dyScreen);
-    return;
-  }
-  const w = window.innerWidth, h = window.innerHeight;
-  const aspect = canvas.width / canvas.height;
-  const dxc = (dxScreen / w) * aspect * state.scale;
-  const dyc = (dyScreen / h) * state.scale;
-  state.cx -= dxc;
-  state.cy -= dyc;
-  requestRender();
-}
-
-function resetView(){
-  if(state.mode === 'deep'){
-    exitDeepMode();
-    return;
-  }
-  state.cx = initialState.cx;
-  state.cy = initialState.cy;
-  state.scale = initialState.scale;
-  requestRender();
-}
-
-// =====================================================================
-// Deep-dive mode: perturbation-theory zooming with an arbitrary-precision
-// reference orbit. See the fragSrcDeep shader above for the GPU-side math.
-// =====================================================================
-
-// Must not exceed the hard loop bound in fragSrcDeep's for-loop.
-// Deep views genuinely need this many: measured against ground truth, detail at
-// 1e15-1e25 around a boundary point only resolves at ~10,000-18,000 iterations.
-// Raising the ceiling is nearly free for pixels that escape early — only points
-// inside the set pay the full loop — but those are exactly the black regions
-// that dominate a deep view, hence the user-selectable budget below.
-const DEEP_MAX_ORBIT_ITER = 20000;
-
-// Detail presets: higher = more resolved structure, but every in-set pixel runs
-// the full loop, so this is the main thing that decides whether a deep frame
-// takes a moment or a very long moment.
-const DEEP_DETAIL_LEVELS = [
-  {label:'速い',  iters:2000},
-  {label:'標準',  iters:6000},
-  {label:'こだわり', iters:20000}
-];
-
-// Deep mode renders at reduced resolution: the per-pixel cost is orders of
-// magnitude higher than normal mode, and at full retina density an iPad can
-// stall long enough for the browser to drop the GL context.
-const DEEP_RENDER_SCALE = 1.0;
-
-// How deep the perturbation approach can actually go here. The per-pixel offset
-// dc is held as a double-single pair of float32s, and float32 bottoms out near
-// 1e-38, so once 3*10^-exponent approaches that the offsets collapse to zero.
-// 10^30 leaves comfortable margin — and is already 10^17 times deeper than
-// normal mode manages.
-const DEEP_MAX_EXPONENT = 30;
-
-// Convert a screen point to a {dx, dy} offset (as plain floats, small deltas
-// relative to the current deep view) from the current deep.center.
-function screenToDeepOffset(sx, sy){
-  const w = window.innerWidth, h = window.innerHeight;
-  const aspect = canvas.width / canvas.height;
-  let uvx = (sx / w) - 0.5;
-  let uvy = (sy / h) - 0.5;
-  uvx *= aspect;
-  const pixelScale = 3.0 * Math.pow(10, -deep.zoomExponent);
-  return [uvx * pixelScale, uvy * pixelScale];
-}
-
-// Compute the reference orbit for deep.center using arbitrary precision, then
-// upload it as a float texture. Runs async-ish (chunked) so the UI can show a
-// "computing" indicator, since precision/iteration count can make this take
-// a noticeable moment at extreme depths.
-let orbitUpdateTimer = null;
-function requestOrbitUpdate(immediate){
-  // Debounce so rapid wheel/drag events don't trigger a full BigFloat orbit
-  // recompute on every single event — only the last one in a short burst runs.
-  if(orbitUpdateTimer) clearTimeout(orbitUpdateTimer);
-  if(immediate){
-    computeOrbitAndUpload();
-  } else {
-    orbitUpdateTimer = setTimeout(computeOrbitAndUpload, 120);
-  }
-}
-
-function computeOrbitAndUpload(){
-  if(!floatTextureSupported){
-    alert('このブラウザ・端末では深掘りモードに必要な機能（floatテクスチャ）が使えません。');
-    return;
-  }
-  deep.computing = true;
-  document.getElementById('computingOverlay').style.display = 'block';
-
-  // Precision needs to comfortably exceed the current zoom depth in decimal
-  // digits, with margin for the iteration count (error can compound).
-  const neededDigits = Math.max(30, Math.ceil(deep.zoomExponent) + 25);
-  deep.precision = neededDigits;
-
-  // Iteration count comes from the user's detail preset rather than a formula:
-  // how many iterations a deep view needs depends on where you are, not just how
-  // far in you are, so a depth-based guess is wrong as often as it's right.
-  deep.maxOrbitIter = Math.min(DEEP_MAX_ORBIT_ITER, DEEP_DETAIL_LEVELS[deep.detailLevel].iters);
-
-  // Double rAF, not single: a single rAF callback runs *before* the next paint,
-  // so the overlay we just unhid wouldn't actually be on screen yet when the
-  // synchronous BigFloat loop starts blocking the main thread. Waiting two
-  // frames guarantees the first paint has landed.
-  requestAnimationFrame(()=>{ requestAnimationFrame(()=>{
-    const p = deep.precision;
-    let Zx = BigFloat.fromNumber(0, p);
-    let Zy = BigFloat.fromNumber(0, p);
-    const cx = deep.center.x;
-    const cy = deep.center.y;
-
-    const maxIter = deep.maxOrbitIter;
-    const data = new Float32Array(maxIter * 4);
-    let n = 0;
-    for(; n < maxIter; n++){
-      const [zxHi, zxLo] = Zx.toHiLo();
-      const [zyHi, zyLo] = Zy.toHiLo();
-      data[n*4+0] = zxHi;
-      data[n*4+1] = zxLo;
-      data[n*4+2] = zyHi;
-      data[n*4+3] = zyLo;
-
-      const Zx2 = Zx.mul(Zx);
-      const Zy2 = Zy.mul(Zy);
-      const mag2 = Zx2.toNumber() + Zy2.toNumber();
-      if(mag2 > 4){ n++; break; }
-
-      const newZx = Zx2.sub(Zy2).add(cx);
-      const newZy = Zx.mul(Zy).add(Zx.mul(Zy)).add(cy);
-      Zx = newZx;
-      Zy = newZy;
+  function resizeCanvasIfNeeded() {
+    const dpr = Math.min(window.devicePixelRatio || 1, 2);
+    const w = Math.floor(window.innerWidth * dpr);
+    const h = Math.floor(window.innerHeight * dpr);
+    if (canvas.width !== w || canvas.height !== h) {
+      canvas.width = w;
+      canvas.height = h;
     }
-    deep.orbitLen = n;
-    deep.orbit = data;
+  }
 
-    uploadOrbitTexture(data, n);
+  function setMandelUniforms(preview) {
+    gl.useProgram(mandelProg);
+    const [reHi, reLo] = splitDouble(centerRe);
+    const [imHi, imLo] = splitDouble(centerIm);
+    const [scHi, scLo] = splitDouble(scale);
+    gl.uniform1f(U.aspect, canvas.width / canvas.height);
+    gl.uniform2f(U.centerRe, reHi, reLo);
+    gl.uniform2f(U.centerIm, imHi, imLo);
+    gl.uniform2f(U.scale, scHi, scLo);
+    const full = computeMaxIter();
+    // The preview trades resolution, not detail: keeping iterations high
+    // avoids the "solid black blobs" artefact where under-iterated pixels
+    // get misclassified as interior while the view is moving.
+    gl.uniform1i(U.maxIter, preview ? Math.max(90, Math.round(full * 0.75)) : full);
+    gl.uniform1i(U.paletteId, paletteId);
+    gl.uniform1i(U.bgMode, bgMode);
+    gl.uniform1f(U.colorPhase, colorPhase);
+  }
 
-    deep.computing = false;
-    document.getElementById('computingOverlay').style.display = 'none';
-    updateDeepStatusPanel();
-    requestRender();
-  }); });
-}
+  function doRender() {
+    renderQueued = false;
+    resizeCanvasIfNeeded();
 
-function uploadOrbitTexture(data, len){
-  // Pack the orbit as an exactly-square RGBA float texture (1 texel per iteration).
-  // Square matters: the shader divides both the column and the row by the same
-  // uOrbitTexWidth when building texture coordinates, so a non-square texture
-  // would sample the wrong rows entirely.
-  const texWidth = Math.max(1, Math.ceil(Math.sqrt(len)));
-  const texHeight = texWidth;
-  const padded = new Float32Array(texWidth * texHeight * 4);
-  padded.set(data.subarray(0, len*4));
+    const preview = wantPreview;
+    wantPreview = false;
 
-  if(!deep.orbitTex) deep.orbitTex = gl.createTexture();
-  gl.bindTexture(gl.TEXTURE_2D, deep.orbitTex);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MAG_FILTER, gl.NEAREST);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-  gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+    gl.bindBuffer(gl.ARRAY_BUFFER, quadBuf);
+    gl.enableVertexAttribArray(0);
+    gl.vertexAttribPointer(0, 2, gl.FLOAT, false, 0, 0);
 
-  const internalFormat = gl2Available ? gl.RGBA32F : gl.RGBA;
-  const type = gl.FLOAT;
-  gl.texImage2D(gl.TEXTURE_2D, 0, internalFormat, texWidth, texHeight, 0, gl.RGBA, type, padded);
+    if (preview) {
+      const pw = Math.max(2, Math.floor(canvas.width * PREVIEW_SCALE));
+      const ph = Math.max(2, Math.floor(canvas.height * PREVIEW_SCALE));
+      ensureFbo(pw, ph);
 
-  deep.orbitTexWidth = texWidth;
-  deep.orbitTexHeight = texHeight;
-}
+      gl.bindFramebuffer(gl.FRAMEBUFFER, fbo);
+      gl.viewport(0, 0, pw, ph);
+      setMandelUniforms(true);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-function updateDeepStatusPanel(){
-  const panel = document.getElementById('deepStatus');
-  panel.style.display = 'block';
-  // A short reference orbit means the anchor point escaped early, so pixels that
-  // survive longer than it have no reference data left and come out black.
-  const shortOrbit = deep.orbitLen < 200;
-  const levelBtns = DEEP_DETAIL_LEVELS.map((lv, i)=>
-    '<button class="detailBtn' + (i===deep.detailLevel ? ' on' : '') + '" data-level="' + i + '">' + lv.label + '</button>'
-  ).join('');
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      gl.useProgram(blitProg);
+      gl.activeTexture(gl.TEXTURE0);
+      gl.bindTexture(gl.TEXTURE_2D, fboTex);
+      gl.uniform1i(uTexLoc, 0);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
 
-  panel.innerHTML =
-    '<div class="row"><span>精度</span><span>' + deep.precision + '桁</span></div>' +
-    '<div class="row"><span>軌道反復</span><span>' + deep.orbitLen + '</span></div>' +
-    (shortOrbit ? '<div class="warn">⚠ 基準点が浅いため黒く出ることがあります。黒と色の境目へ移動してください。</div>' : '') +
-    '<div style="margin-top:6px;">精細さ</div>' +
-    '<div class="detailRow">' + levelBtns + '</div>' +
-    '<button id="rebaseBtn">この位置で軌道を再計算</button>';
+      // Settle into a crisp full-resolution pass once motion stops.
+      clearTimeout(refineTimer);
+      refineTimer = setTimeout(() => { if (!autoZoomActive) scheduleRender(false); }, 110);
+    } else {
+      gl.bindFramebuffer(gl.FRAMEBUFFER, null);
+      gl.viewport(0, 0, canvas.width, canvas.height);
+      setMandelUniforms(false);
+      gl.drawArrays(gl.TRIANGLES, 0, 6);
+    }
 
-  panel.querySelectorAll('.detailBtn').forEach(btn=>{
-    btn.addEventListener('click', ()=>{
-      deep.detailLevel = parseInt(btn.getAttribute('data-level'), 10);
-      requestOrbitUpdate(true);
+    updateHud();
+  }
+
+  const hudRe = document.getElementById('hudRe');
+  const hudIm = document.getElementById('hudIm');
+  const hudZoom = document.getElementById('hudZoom');
+  const hudLimit = document.getElementById('hudLimit');
+
+  function updateHud() {
+    const digits = Math.min(15, Math.max(6, Math.round(-Math.log10(scale)) + 3));
+    hudRe.textContent = centerRe.toFixed(digits);
+    hudIm.textContent = centerIm.toFixed(digits);
+    const zoom = 1.6 / scale;
+    hudZoom.textContent = zoom < 1000
+      ? zoom.toFixed(2) + '×'
+      : zoom.toExponential(2).replace('+', '') + '×';
+    hudLimit.classList.toggle('show', scale <= MIN_SCALE * 1.05);
+  }
+
+  // =====================================================================
+  // Interaction: drag to pan, wheel to zoom, pinch to zoom.
+  // Double-tap is deliberately not bound to zoom.
+  // =====================================================================
+  let isDragging = false;
+  let lastX = 0, lastY = 0;
+
+  function screenToComplexDelta(dxPx, dyPx) {
+    const factor = (2 * scale) / canvas.height;
+    return [dxPx * factor, -dyPx * factor];
+  }
+
+  function zoomAt(px, py, factor) {
+    const w = canvas.width, h = canvas.height;
+    const aspect = w / h;
+    const nx = (px / w - 0.5) * 2 * aspect;
+    const ny = -(py / h - 0.5) * 2;
+    const worldX = centerRe + nx * scale;
+    const worldY = centerIm + ny * scale;
+
+    scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale * factor));
+
+    centerRe = worldX - nx * scale;
+    centerIm = worldY - ny * scale;
+  }
+
+  function hideHint() {
+    document.getElementById('hint').classList.add('fade');
+  }
+
+  canvas.addEventListener('mousedown', (e) => {
+    isDragging = true;
+    lastX = e.clientX; lastY = e.clientY;
+    canvas.classList.add('dragging');
+  });
+  window.addEventListener('mousemove', (e) => {
+    if (!isDragging) return;
+    const dpr = canvas.width / window.innerWidth;
+    const [cdx, cdy] = screenToComplexDelta((e.clientX - lastX) * dpr, (e.clientY - lastY) * dpr);
+    lastX = e.clientX; lastY = e.clientY;
+    centerRe -= cdx;
+    centerIm -= cdy;
+    hideHint();
+    scheduleRender(true);
+  });
+  window.addEventListener('mouseup', () => {
+    if (isDragging) {
+      isDragging = false;
+      canvas.classList.remove('dragging');
+      scheduleRender(false);
+    }
+  });
+
+  canvas.addEventListener('wheel', (e) => {
+    e.preventDefault();
+    const dpr = canvas.width / window.innerWidth;
+    zoomAt(e.clientX * dpr, e.clientY * dpr, Math.exp(e.deltaY * 0.0016));
+    hideHint();
+    scheduleRender(true);
+  }, { passive: false });
+
+  let touchState = null;
+
+  canvas.addEventListener('touchstart', (e) => {
+    hideHint();
+    if (e.touches.length === 1) {
+      touchState = { mode: 'pan', x: e.touches[0].clientX, y: e.touches[0].clientY };
+    } else if (e.touches.length === 2) {
+      const [t0, t1] = e.touches;
+      touchState = {
+        mode: 'pinch',
+        dist: Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY)
+      };
+    }
+    e.preventDefault();
+  }, { passive: false });
+
+  canvas.addEventListener('touchmove', (e) => {
+    e.preventDefault();
+    if (!touchState) return;
+    const dpr = canvas.width / window.innerWidth;
+
+    if (touchState.mode === 'pan' && e.touches.length === 1) {
+      const t = e.touches[0];
+      const [cdx, cdy] = screenToComplexDelta((t.clientX - touchState.x) * dpr, (t.clientY - touchState.y) * dpr);
+      touchState.x = t.clientX;
+      touchState.y = t.clientY;
+      centerRe -= cdx;
+      centerIm -= cdy;
+      scheduleRender(true);
+    } else if (touchState.mode === 'pinch' && e.touches.length === 2) {
+      const [t0, t1] = e.touches;
+      const newDist = Math.hypot(t1.clientX - t0.clientX, t1.clientY - t0.clientY);
+      const cx = (t0.clientX + t1.clientX) / 2;
+      const cy = (t0.clientY + t1.clientY) / 2;
+      zoomAt(cx * dpr, cy * dpr, touchState.dist / Math.max(newDist, 1));
+      touchState.dist = newDist;
+      scheduleRender(true);
+    }
+  }, { passive: false });
+
+  canvas.addEventListener('touchend', (e) => {
+    if (e.touches.length === 0) {
+      touchState = null;
+      scheduleRender(false);
+    } else if (e.touches.length === 1) {
+      touchState = { mode: 'pan', x: e.touches[0].clientX, y: e.touches[0].clientY };
+    }
+  });
+
+  document.addEventListener('gesturestart', (e) => e.preventDefault());
+  document.addEventListener('dblclick', (e) => e.preventDefault());
+  window.addEventListener('resize', () => scheduleRender(false));
+
+  // =====================================================================
+  // UI
+  // =====================================================================
+  const PALETTES = [
+    { id: 0, name: '虹色', css: 'linear-gradient(135deg,#ff3b3b,#ffd93b,#3bff88,#3bb8ff,#a23bff)' },
+    { id: 1, name: '炎',   css: 'linear-gradient(135deg,#1a0800,#ff8c1a,#fff0a0)' },
+    { id: 2, name: '深海', css: 'linear-gradient(135deg,#020410,#0d59a6,#bff5ff)' },
+    { id: 3, name: '金',   css: 'linear-gradient(135deg,#111,#d9a441)' },
+    { id: 4, name: '紫夢', css: 'linear-gradient(135deg,#0a0014,#8c26bf,#ffc0e0)' },
+  ];
+
+  const swatchContainer = document.getElementById('paletteSwatches');
+  PALETTES.forEach((p, i) => {
+    const el = document.createElement('div');
+    el.className = 'swatch' + (i === 0 ? ' active' : '');
+    el.style.background = p.css;
+    el.title = p.name;
+    el.addEventListener('click', () => {
+      paletteId = p.id;
+      document.querySelectorAll('.swatch').forEach(s => s.classList.remove('active'));
+      el.classList.add('active');
+      scheduleRender(false);
+    });
+    swatchContainer.appendChild(el);
+  });
+
+  document.querySelectorAll('.bgswatch').forEach(el => {
+    el.addEventListener('click', () => {
+      bgMode = parseInt(el.dataset.bg, 10);
+      document.querySelectorAll('.bgswatch').forEach(s => s.classList.remove('active'));
+      el.classList.add('active');
+      scheduleRender(false);
     });
   });
-  document.getElementById('rebaseBtn').addEventListener('click', ()=>{
-    requestOrbitUpdate(true);
+
+  const iterSlider = document.getElementById('iterSlider');
+  const iterVal = document.getElementById('iterVal');
+  const iterLabels = ['低', '標準-', '標準', '標準+', '高'];
+  iterSlider.addEventListener('input', () => {
+    const v = parseInt(iterSlider.value, 10);
+    iterBias = v - 2;
+    iterVal.textContent = iterLabels[v];
+    scheduleRender(false);
   });
-}
 
-// Plain float64 escape count, used only for picking a good reference point at
-// entry time (where we're still shallow enough for float64 to tell candidate
-// points apart).
-function escapeCountFloat(cx, cy, maxIter){
-  let zx = 0, zy = 0;
-  for(let i = 0; i < maxIter; i++){
-    const zx2 = zx*zx, zy2 = zy*zy;
-    if(zx2 + zy2 > 4) return i;
-    const nzx = zx2 - zy2 + cx;
-    const nzy = 2*zx*zy + cy;
-    zx = nzx; zy = nzy;
-  }
-  return maxIter;
-}
+  document.getElementById('precisionNote').textContent = isGL2
+    ? '擬似倍精度（ビット分割方式）で動作中。拡大率およそ1000億倍まで細部を保ちます。'
+    : 'WebGL2が使えないため簡易方式で動作中。端末によっては浅いところで粗くなります。';
 
-// Perturbation needs a reference orbit that stays bounded for many iterations.
-// If the view center happens to sit outside the set, its orbit escapes after a
-// handful of steps and every pixel runs out of reference data — which paints the
-// whole screen black. So at entry we scan the current view for the point with the
-// longest-surviving orbit and nudge the center there. The shift is at most half a
-// screen, and it's what makes deep mode usable without the user having to
-// hand-pick a good spot.
-function findGoodReference(cx, cy, scale, aspect, maxIter){
-  let best = {x: cx, y: cy, iters: escapeCountFloat(cx, cy, maxIter)};
-  if(best.iters >= maxIter) return best; // center is already inside the set
-  const N = 9;
-  for(let i = 0; i < N; i++){
-    for(let j = 0; j < N; j++){
-      const ux = (i/(N-1) - 0.5) * 0.9;
-      const uy = (j/(N-1) - 0.5) * 0.9;
-      const px = cx + ux * aspect * scale;
-      const py = cy + uy * scale;
-      const it = escapeCountFloat(px, py, maxIter);
-      if(it > best.iters) best = {x: px, y: py, iters: it};
+  document.getElementById('resetBtn').addEventListener('click', () => {
+    if (autoZoomActive) stopAutoZoom();
+    centerRe = -0.5;
+    centerIm = 0.0;
+    scale = 1.6;
+    scheduleRender(false);
+  });
+
+  const panelToggle = document.getElementById('panelToggle');
+  const panel = document.getElementById('panel');
+  panelToggle.addEventListener('click', (e) => {
+    e.stopPropagation();
+    panel.classList.toggle('open');
+  });
+  document.addEventListener('click', (e) => {
+    if (panel.classList.contains('open') && !panel.contains(e.target) && !panelToggle.contains(e.target)) {
+      panel.classList.remove('open');
     }
-  }
-  return best;
-}
+  });
 
-function enterDeepMode(cxNum, cyNum, zoomExponent){
-  state.mode = 'deep';
-  const p = Math.max(30, Math.ceil(zoomExponent) + 25);
-  // fromNumber (not fromString) because Number#toString emits exponent notation
-  // like "1.5e-7" for small values, which the plain-decimal parser can't read.
-  deep.center = {
-    x: BigFloat.fromNumber(cxNum, p),
-    y: BigFloat.fromNumber(cyNum, p)
-  };
-  deep.zoomExponent = Math.min(DEEP_MAX_EXPONENT, Math.max(0, zoomExponent));
-  document.getElementById('deepModeBtn').classList.add('active');
-  document.getElementById('deepModeBtn').textContent = '🔬 通常モードへ戻る';
-  resize(); // deep mode renders at a lower pixel density
-  requestOrbitUpdate(true);
-}
+  // =====================================================================
+  // Auto-zoom: steers toward boundary detail and keeps diving.
+  // =====================================================================
+  let autoZoomActive = false;
+  let autoZoomRAF = null;
+  let targetRe = centerRe, targetIm = centerIm;
+  let lastPickTime = 0;
 
-function exitDeepMode(){
-  state.mode = 'normal';
-  deep.orbit = null;
-  document.getElementById('deepModeBtn').classList.remove('active');
-  document.getElementById('deepModeBtn').textContent = '🔬 深掘りモード';
-  document.getElementById('deepStatus').style.display = 'none';
-  resize(); // back to full pixel density
-  requestRender();
-}
-
-// Re-center deep.center by adding a small screen-space offset (as plain floats
-// — fine since it's a delta at the current zoom scale), then bump precision
-// and recompute the orbit. Used by pan and by zoom-at-cursor.
-function requiredPrecision(){
-  return Math.max(30, Math.ceil(deep.zoomExponent) + 25);
-}
-
-function recenterDeepBy(dx, dy){
-  // Re-wrap the centre at the precision the *current* depth needs. Without this
-  // it would keep whatever precision it was created with on entry, so zooming
-  // from 1e15 down to 1e30 would quietly leave the anchor short of digits.
-  // Raising precision is lossless — round() only ever truncates.
-  const p = requiredPrecision();
-  deep.center = {
-    x: new BigFloat(deep.center.x.m, deep.center.x.e, p).add(BigFloat.fromNumber(dx, p)),
-    y: new BigFloat(deep.center.y.m, deep.center.y.e, p).add(BigFloat.fromNumber(dy, p))
-  };
-}
-
-function zoomAtDeep(sx, sy, factor){
-  const [offX, offY] = screenToDeepOffset(sx, sy);
-  const newExponent = deep.zoomExponent - Math.log10(factor);
-  // Re-center on the point under the cursor, proportionally to how much we're zooming in.
-  const shift = 1 - factor; // factor<1 means zooming in; shift>0 moves center toward cursor
-  recenterDeepBy(offX * shift, offY * shift);
-  deep.zoomExponent = Math.min(DEEP_MAX_EXPONENT, Math.max(0, newExponent));
-  requestOrbitUpdate(false);
-}
-
-function zoomToRectDeep(x0,y0,x1,y1){
-  const cx0 = Math.min(x0,x1), cx1 = Math.max(x0,x1);
-  const cy0 = Math.min(y0,y1), cy1 = Math.max(y0,y1);
-  const w = cx1 - cx0, h = cy1 - cy0;
-  if(w < 4 || h < 4) return;
-
-  const midSx = (cx0+cx1)/2, midSy = (cy0+cy1)/2;
-  const [offX, offY] = screenToDeepOffset(midSx, midSy);
-  recenterDeepBy(offX, offY);
-
-  const screenW = window.innerWidth, screenH = window.innerHeight;
-  const fracW = w / screenW;
-  const fracH = h / screenH;
-  const aspect = canvas.width / canvas.height;
-  const frac = Math.max(fracW, fracH / aspect);
-  deep.zoomExponent = Math.min(DEEP_MAX_EXPONENT, Math.max(0, deep.zoomExponent - Math.log10(frac)));
-
-  requestOrbitUpdate(true);
-}
-
-function panByDeep(dxScreen, dyScreen){
-  const w = window.innerWidth, h = window.innerHeight;
-  const aspect = canvas.width / canvas.height;
-  const pixelScale = 3.0 * Math.pow(10, -deep.zoomExponent);
-  const dxc = (dxScreen / w) * aspect * pixelScale;
-  const dyc = (dyScreen / h) * pixelScale;
-  recenterDeepBy(-dxc, -dyc);
-  requestOrbitUpdate(false);
-}
-
-// ---------- Mouse drag-to-zoom (desktop) ----------
-const selBox = document.getElementById('selectionBox');
-let dragging = false;
-let dragStart = null;
-let didDrag = false;
-let panMode = false; // true when this drag is a pan (Shift+left-click or right-click)
-let panLast = null;
-
-canvas.addEventListener('mousedown', (e)=>{
-  // Right-click (button 2) always pans. Left-click (button 0) pans when Shift is held,
-  // otherwise it's a selection-box zoom drag.
-  if(e.button === 2){
-    e.preventDefault();
-    panMode = true;
-  } else if(e.button === 0 && e.shiftKey){
-    panMode = true;
-  } else if(e.button === 0){
-    panMode = false;
-  } else {
-    return;
-  }
-
-  dragging = true;
-  didDrag = false;
-  dragStart = {x:e.clientX, y:e.clientY};
-  panLast = {x:e.clientX, y:e.clientY};
-
-  if(!panMode){
-    selBox.style.left = e.clientX + 'px';
-    selBox.style.top = e.clientY + 'px';
-    selBox.style.width = '0px';
-    selBox.style.height = '0px';
-  } else {
-    canvas.style.cursor = 'grabbing';
-  }
-});
-
-// Suppress the native right-click context menu so right-drag can be used for panning.
-canvas.addEventListener('contextmenu', (e)=> e.preventDefault());
-
-window.addEventListener('mousemove', (e)=>{
-  if(!dragging || !dragStart) return;
-
-  if(panMode){
-    const dx = e.clientX - panLast.x;
-    const dy = e.clientY - panLast.y;
-    if(dx !== 0 || dy !== 0){
-      didDrag = true;
-      panBy(dx, dy);
+  function escapeIter(cRe, cIm, maxIter) {
+    let zr = 0, zi = 0;
+    for (let i = 0; i < maxIter; i++) {
+      const zr2 = zr * zr, zi2 = zi * zi;
+      if (zr2 + zi2 > 4.0) return i;
+      const nzi = 2 * zr * zi + cIm;
+      zr = zr2 - zi2 + cRe;
+      zi = nzi;
     }
-    panLast = {x:e.clientX, y:e.clientY};
-    return;
+    return -1;
   }
 
-  const dx = e.clientX - dragStart.x;
-  const dy = e.clientY - dragStart.y;
-  if(Math.abs(dx) > 3 || Math.abs(dy) > 3){
-    didDrag = true;
-    selBox.style.display = 'block';
-  }
-  const x = Math.min(e.clientX, dragStart.x);
-  const y = Math.min(e.clientY, dragStart.y);
-  selBox.style.left = x + 'px';
-  selBox.style.top = y + 'px';
-  selBox.style.width = Math.abs(dx) + 'px';
-  selBox.style.height = Math.abs(dy) + 'px';
-});
-
-window.addEventListener('mouseup', (e)=>{
-  if(!dragging) return;
-  dragging = false;
-  selBox.style.display = 'none';
-  if(panMode){
-    canvas.style.cursor = 'crosshair';
-  } else if(didDrag && dragStart){
-    zoomToRect(dragStart.x, dragStart.y, e.clientX, e.clientY);
-  }
-  panMode = false;
-  panLast = null;
-  dragStart = null;
-});
-
-// Wheel zoom (desktop / trackpad) — centers on cursor
-canvas.addEventListener('wheel', (e)=>{
-  e.preventDefault();
-  const factor = e.deltaY > 0 ? 1.15 : 1/1.15;
-  zoomAt(e.clientX, e.clientY, factor);
-}, {passive:false});
-
-// ---------- Touch: pinch-zoom + two-finger pan (no double-tap zoom) ----------
-let touchState = null;
-
-function touchDist(t0,t1){
-  const dx = t0.clientX - t1.clientX, dy = t0.clientY - t1.clientY;
-  return Math.hypot(dx,dy);
-}
-function touchMid(t0,t1){
-  return {x:(t0.clientX+t1.clientX)/2, y:(t0.clientY+t1.clientY)/2};
-}
-
-canvas.addEventListener('touchstart', (e)=>{
-  e.preventDefault();
-  if(e.touches.length === 2){
-    const t0=e.touches[0], t1=e.touches[1];
-    touchState = {
-      mode:'pinch',
-      startDist: touchDist(t0,t1),
-      startScale: state.scale,
-      startMid: touchMid(t0,t1),
-      lastMid: touchMid(t0,t1),
-      startCx: state.cx,
-      startCy: state.cy
-    };
-  } else if(e.touches.length === 1){
-    // single-finger drag = selection box (like mouse)
-    const t = e.touches[0];
-    dragging = true;
-    didDrag = false;
-    dragStart = {x:t.clientX, y:t.clientY};
-    selBox.style.left = t.clientX + 'px';
-    selBox.style.top = t.clientY + 'px';
-    selBox.style.width = '0px';
-    selBox.style.height = '0px';
-    touchState = {mode:'drag'};
-  }
-}, {passive:false});
-
-canvas.addEventListener('touchmove', (e)=>{
-  e.preventDefault();
-  if(!touchState) return;
-
-  if(touchState.mode === 'pinch' && e.touches.length === 2){
-    const t0=e.touches[0], t1=e.touches[1];
-    const dist = touchDist(t0,t1);
-    const mid = touchMid(t0,t1);
-
-    const factor = touchState.startDist / Math.max(dist, 1);
-    let newScale = touchState.startScale * factor;
-    newScale = Math.min(Math.max(newScale, MIN_SCALE), MAX_SCALE);
-
-    // Keep the point under the pinch midpoint stable, plus allow panning as midpoint moves
-    const [wx, wy] = screenToComplexFrom(touchState.startCx, touchState.startCy, touchState.startScale, touchState.startMid.x, touchState.startMid.y);
-
-    const actualFactor = newScale / touchState.startScale;
-    let newCx = wx - (wx - touchState.startCx) * actualFactor;
-    let newCy = wy - (wy - touchState.startCy) * actualFactor;
-
-    // account for midpoint translation (panning while pinching)
-    const w = window.innerWidth, h = window.innerHeight;
+  // Sample the current view on the CPU (JS doubles are plenty here — this
+  // only picks where to head next, it never renders) and head for the
+  // richest boundary point: escapes late, but does escape.
+  function pickNextTarget() {
+    const gridN = 24;
+    const sampleMaxIter = Math.min(700, computeMaxIter());
     const aspect = canvas.width / canvas.height;
-    const dxScreen = mid.x - touchState.startMid.x;
-    const dyScreen = mid.y - touchState.startMid.y;
-    const dxc = (dxScreen / w) * aspect * newScale;
-    const dyc = (dyScreen / h) * newScale;
-    newCx -= dxc;
-    newCy -= dyc;
+    let best = null, bestScore = -1;
 
-    state.scale = newScale;
-    state.cx = newCx;
-    state.cy = newCy;
-    requestRender();
-  } else if(touchState.mode === 'drag' && e.touches.length === 1){
-    const t = e.touches[0];
-    const dx = t.clientX - dragStart.x;
-    const dy = t.clientY - dragStart.y;
-    if(Math.abs(dx) > 3 || Math.abs(dy) > 3){
-      didDrag = true;
-      selBox.style.display = 'block';
+    for (let gy = 0; gy < gridN; gy++) {
+      for (let gx = 0; gx < gridN; gx++) {
+        const nx = ((gx + 0.5) / gridN - 0.5) * 2 * 0.7;
+        const ny = ((gy + 0.5) / gridN - 0.5) * 2 * 0.7;
+        const cRe = centerRe + nx * scale * aspect;
+        const cIm = centerIm + ny * scale;
+        const it = escapeIter(cRe, cIm, sampleMaxIter);
+        if (it < 0) continue;
+        if (it < sampleMaxIter * 0.3) continue;
+        const score = it + Math.random() * sampleMaxIter * 0.06;
+        if (score > bestScore) {
+          bestScore = score;
+          best = { re: cRe, im: cIm };
+        }
+      }
     }
-    const x = Math.min(t.clientX, dragStart.x);
-    const y = Math.min(t.clientY, dragStart.y);
-    selBox.style.left = x + 'px';
-    selBox.style.top = y + 'px';
-    selBox.style.width = Math.abs(dx) + 'px';
-    selBox.style.height = Math.abs(dy) + 'px';
-  }
-}, {passive:false});
-
-canvas.addEventListener('touchend', (e)=>{
-  if(touchState && touchState.mode === 'drag' && dragging){
-    dragging = false;
-    selBox.style.display = 'none';
-    if(didDrag && dragStart && e.changedTouches.length>0){
-      const t = e.changedTouches[0];
-      zoomToRect(dragStart.x, dragStart.y, t.clientX, t.clientY);
+    if (!best) {
+      best = {
+        re: centerRe + (Math.random() - 0.5) * scale * 0.3,
+        im: centerIm + (Math.random() - 0.5) * scale * 0.3
+      };
     }
-    dragStart = null;
+    return best;
   }
-  if(e.touches.length === 0){
-    touchState = null;
-  } else if(e.touches.length === 1){
-    touchState = null;
+
+  const AUTO_ZOOM_RATE = 0.988;
+  const RETARGET_THRESHOLD = MIN_SCALE * 30;
+
+  function autoZoomTick() {
+    if (!autoZoomActive) return;
+
+    centerRe += (targetRe - centerRe) * 0.02;
+    centerIm += (targetIm - centerIm) * 0.02;
+    scale *= AUTO_ZOOM_RATE;
+
+    if (scale < RETARGET_THRESHOLD) {
+      // Approaching the precision floor. Pull back out and hand off to a
+      // fresh point so the dive reads as continuous rather than stalling
+      // into mush.
+      scale = Math.min(MAX_SCALE * 0.02, scale * 5e5);
+      const next = pickNextTarget();
+      targetRe = next.re;
+      targetIm = next.im;
+      centerRe = next.re;
+      centerIm = next.im;
+      lastPickTime = performance.now();
+    } else if (performance.now() - lastPickTime > 4000) {
+      lastPickTime = performance.now();
+      const next = pickNextTarget();
+      targetRe = next.re;
+      targetIm = next.im;
+    }
+
+    scale = Math.max(MIN_SCALE, Math.min(MAX_SCALE, scale));
+    scheduleRender(true);
+    autoZoomRAF = requestAnimationFrame(autoZoomTick);
   }
-}, {passive:false});
 
-function screenToComplexFrom(cx, cy, scale, sx, sy){
-  const w = window.innerWidth, h = window.innerHeight;
-  const aspect = canvas.width / canvas.height;
-  let uvx = (sx / w) - 0.5;
-  let uvy = (sy / h) - 0.5;
-  uvx *= aspect;
-  const px = uvx * scale;
-  const py = uvy * scale;
-  return [cx + px, cy + py];
-}
+  const autoZoomBtn = document.getElementById('autoZoomBtn');
+  const autoZoomIcon = document.getElementById('autoZoomIcon');
+  const autoZoomLabel = document.getElementById('autoZoomLabel');
+  const PLAY_PATH = '<polygon points="5 3 19 12 5 21 5 3"></polygon>';
+  const PAUSE_PATH = '<rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect>';
 
-// Prevent double-tap zoom / iOS gesture zoom explicitly
-document.addEventListener('gesturestart', (e)=> e.preventDefault());
-document.addEventListener('gesturechange', (e)=> e.preventDefault());
-document.addEventListener('gestureend', (e)=> e.preventDefault());
-let lastTouchEnd = 0;
-document.addEventListener('touchend', (e)=>{
-  const now = Date.now();
-  if(now - lastTouchEnd <= 300){
-    e.preventDefault();
+  function stopAutoZoom() {
+    autoZoomActive = false;
+    if (autoZoomRAF) cancelAnimationFrame(autoZoomRAF);
+    autoZoomBtn.classList.remove('active');
+    autoZoomIcon.innerHTML = PLAY_PATH;
+    autoZoomLabel.textContent = 'オートズーム';
+    scheduleRender(false);
   }
-  lastTouchEnd = now;
-}, {passive:false});
 
-// ---------- Buttons ----------
-document.getElementById('zoomInBtn').addEventListener('click', ()=> zoomAtCenter(1/1.6));
-document.getElementById('zoomOutBtn').addEventListener('click', ()=> zoomAtCenter(1.6));
-document.getElementById('resetBtn').addEventListener('click', resetView);
+  function startAutoZoom() {
+    autoZoomActive = true;
+    lastPickTime = performance.now();
+    const next = pickNextTarget();
+    targetRe = next.re;
+    targetIm = next.im;
+    autoZoomBtn.classList.add('active');
+    autoZoomIcon.innerHTML = PAUSE_PATH;
+    autoZoomLabel.textContent = '停止';
+    hideHint();
+    autoZoomRAF = requestAnimationFrame(autoZoomTick);
+  }
 
-// Continuous zoom on press-and-hold for buttons
-function holdRepeat(el, fn){
-  let interval = null;
-  let timeout = null;
-  const start = (e)=>{
-    e.preventDefault();
-    fn();
-    timeout = setTimeout(()=>{
-      interval = setInterval(fn, 60);
-    }, 350);
-  };
-  const stop = ()=>{
-    clearTimeout(timeout);
-    clearInterval(interval);
-  };
-  el.addEventListener('mousedown', start);
-  el.addEventListener('touchstart', start, {passive:false});
-  ['mouseup','mouseleave','touchend','touchcancel'].forEach(ev=>{
-    el.addEventListener(ev, stop);
+  autoZoomBtn.addEventListener('click', (e) => {
+    e.stopPropagation();
+    autoZoomActive ? stopAutoZoom() : startAutoZoom();
   });
-}
-holdRepeat(document.getElementById('zoomInBtn'), ()=> zoomAtCenter(1/1.08));
-holdRepeat(document.getElementById('zoomOutBtn'), ()=> zoomAtCenter(1.08));
 
-// ---------- Palette selector ----------
-const palettes = [
-  {name:'クラシック', colors:['#1a1a2e','#4361ee','#f2b134']},
-  {name:'ファイア', colors:['#1a0f0a','#e63946','#f4a259']},
-  {name:'アイス', colors:['#0d1b2a','#5390d9','#caf0f8']},
-  {name:'モノクロ', colors:['#000000','#888888','#ffffff']}
-];
-const paletteRow = document.getElementById('paletteRow');
-palettes.forEach((p, i)=>{
-  const sw = document.createElement('div');
-  sw.className = 'swatch' + (i===0 ? ' active':'');
-  sw.style.background = `linear-gradient(135deg, ${p.colors[0]}, ${p.colors[1]}, ${p.colors[2]})`;
-  sw.title = p.name;
-  sw.addEventListener('click', ()=>{
-    state.paletteIndex = i;
-    document.querySelectorAll('.swatch').forEach(s=>s.classList.remove('active'));
-    sw.classList.add('active');
-    requestRender();
+  ['mousedown', 'wheel', 'touchstart'].forEach(evt => {
+    canvas.addEventListener(evt, () => { if (autoZoomActive) stopAutoZoom(); }, { passive: true });
   });
-  paletteRow.appendChild(sw);
-});
 
-// ---------- Help panel ----------
-const helpPanel = document.getElementById('helpPanel');
-document.getElementById('helpBtn').addEventListener('click', ()=> helpPanel.classList.add('show'));
-document.getElementById('helpClose').addEventListener('click', ()=> helpPanel.classList.remove('show'));
-helpPanel.addEventListener('click', (e)=>{ if(e.target === helpPanel) helpPanel.classList.remove('show'); });
-
-// ---------- Deep-dive mode toggle ----------
-if(!floatTextureSupported){
-  const b = document.getElementById('deepModeBtn');
-  b.style.opacity = '0.4';
-  b.title = 'この端末では深掘りモードに必要な機能（floatテクスチャ）が使えません';
-}
-document.getElementById('deepModeBtn').addEventListener('click', ()=>{
-  if(!floatTextureSupported){
-    alert('この端末・ブラウザでは深掘りモードに必要な機能（floatテクスチャ）が使えないため、通常モードのみご利用いただけます。');
-    return;
-  }
-  if(state.mode === 'deep'){
-    exitDeepMode();
-  } else {
-    // Carry over the current normal-mode view as the deep-mode starting point,
-    // but re-anchor onto a point whose orbit survives long enough to be a usable
-    // reference (see findGoodReference).
-    const zoomExponent = Math.max(0, Math.log10(initialState.scale / state.scale));
-    const aspect = canvas.width / canvas.height;
-    const ref = findGoodReference(state.cx, state.cy, state.scale, aspect, 1500);
-    enterDeepMode(ref.x, ref.y, zoomExponent);
-  }
-});
-
-// ---------- Keyboard (desktop convenience) ----------
-window.addEventListener('keydown', (e)=>{
-  if(e.key === '+' || e.key === '=') zoomAtCenter(1/1.3);
-  if(e.key === '-' || e.key === '_') zoomAtCenter(1.3);
-  if(e.key === 'r' || e.key === 'R') resetView();
-  const panStep = 60;
-  if(e.key === 'ArrowLeft') panBy(-panStep, 0);
-  if(e.key === 'ArrowRight') panBy(panStep, 0);
-  if(e.key === 'ArrowUp') panBy(0, -panStep);
-  if(e.key === 'ArrowDown') panBy(0, panStep);
-  if(e.key === 'Shift' && !dragging) canvas.style.cursor = 'grab';
-});
-window.addEventListener('keyup', (e)=>{
-  if(e.key === 'Shift' && !dragging) canvas.style.cursor = 'crosshair';
-});
-
-// Initial render
-requestRender();
-
+  // =====================================================================
+  // Boot
+  // =====================================================================
+  resizeCanvasIfNeeded();
+  loading.style.opacity = '0';
+  setTimeout(() => { loading.style.display = 'none'; }, 400);
+  scheduleRender(false);
+  setTimeout(hideHint, 5000);
 })();
 </script>
 </body>

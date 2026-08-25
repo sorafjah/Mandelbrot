@@ -124,6 +124,95 @@
   #autoZoomBtn svg { width: 14px; height: 14px; stroke: var(--text-bright); fill: none; }
   #autoZoomBtn.active { background: rgba(217,164,65,.22); border-color: rgba(217,164,65,.55); }
   #autoZoomBtn.active svg { fill: var(--accent); stroke: var(--accent); }
+
+  /* ---- intro modal ---- */
+  #introOverlay {
+    position: fixed; inset: 0;
+    background: rgba(0,0,0,0.6);
+    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    display: flex; align-items: center; justify-content: center;
+    z-index: 200;
+    padding: 24px;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.25s ease;
+  }
+  #introOverlay.show { opacity: 1; pointer-events: auto; }
+  #introCard {
+    width: 100%; max-width: 380px;
+    max-height: 82vh;
+    overflow-y: auto;
+    background: rgba(18,18,22,0.94);
+    border: 1px solid var(--panel-border);
+    border-radius: 16px;
+    padding: 22px 22px 18px;
+    color: var(--text-bright);
+    transform: translateY(12px) scale(0.98);
+    transition: transform 0.25s ease;
+  }
+  #introOverlay.show #introCard { transform: translateY(0) scale(1); }
+  #introCard h2 {
+    margin: 0 0 14px;
+    font-size: 15px;
+    letter-spacing: 0.03em;
+  }
+  #introCard .intro-section { margin-bottom: 14px; }
+  #introCard .intro-section:last-of-type { margin-bottom: 0; }
+  #introCard .intro-label {
+    font-size: 10px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    margin-bottom: 5px;
+  }
+  #introCard .intro-body {
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--text-dim);
+  }
+  #introCard .intro-body b { color: var(--text-bright); font-weight: 600; }
+  #introFooter {
+    margin-top: 18px;
+    padding-top: 14px;
+    border-top: 1px solid var(--panel-border);
+  }
+  .intro-checkbox-row {
+    display: flex; align-items: center; gap: 8px;
+    margin-bottom: 14px;
+    cursor: pointer;
+  }
+  .intro-checkbox-row input {
+    width: 16px; height: 16px;
+    accent-color: var(--accent);
+  }
+  .intro-checkbox-row span { font-size: 11.5px; color: var(--text-dim); }
+  #introCloseBtn {
+    width: 100%;
+    padding: 12px;
+    background: var(--accent);
+    border: none;
+    border-radius: 9px;
+    color: #1a1408;
+    font-size: 13px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  #introCloseBtn:active { opacity: 0.85; }
+
+  #helpBtn {
+    width: 100%;
+    padding: 9px;
+    margin-top: 8px;
+    background: rgba(255,255,255,.06);
+    border: 1px solid var(--panel-border);
+    border-radius: 8px;
+    color: var(--text-dim);
+    font-size: 11px;
+    font-family: inherit;
+    cursor: pointer;
+  }
+  #helpBtn:active { background: rgba(255,255,255,.14); }
 </style>
 </head>
 <body>
@@ -152,7 +241,7 @@
     <h3>背景</h3>
     <div class="bgrow" id="bgSwatches">
       <div class="bgswatch active" data-bg="0" style="background:#000;color:#888;">黒</div>
-      <div class="bgswatch" data-bg="1" style="background:#f4f1ea;color:#333;">明るい</div>
+      <div class="bgswatch" data-bg="1" style="background:#ffffff;color:#333;">明るい</div>
     </div>
   </div>
   <div class="section">
@@ -171,6 +260,7 @@
   </div>
   <div class="section">
     <button class="reset" id="resetBtn">初期表示に戻る</button>
+    <button id="helpBtn">使い方の説明を見る</button>
   </div>
 </div>
 
@@ -180,6 +270,56 @@
 </div>
 
 <div id="hint">ドラッグで移動 ・ ホイール/ピンチでズーム</div>
+
+<div id="introOverlay">
+  <div id="introCard">
+    <h2>マンデルブロ集合について</h2>
+    <div class="intro-section">
+      <div class="intro-label">操作方法</div>
+      <div class="intro-body">
+        <b>PC</b>：ドラッグで移動、ホイールでズーム<br>
+        <b>iPad/スマホ</b>：1本指ドラッグで移動、2本指ピンチでズーム
+      </div>
+    </div>
+    <div class="intro-section">
+      <div class="intro-label">無限にズームできる理由</div>
+      <div class="intro-body">
+        中心点だけを非常に高い精度（約32桁）で計算し、各ピクセルはそこからの「ズレ」だけを追いかける方式（摂動法）を使っています。これにより理論上ほとんど無限に近い深さまで拡大しても模様が崩れません。
+      </div>
+    </div>
+    <div class="intro-section">
+      <div class="intro-label">オートズーム</div>
+      <div class="intro-body">
+        右下のボタンで、境界の複雑な模様を自動で探しながらどんどん潜っていくモードに切り替えられます。手動で操作すると自動的に止まります。
+      </div>
+    </div>
+    <div class="intro-section">
+      <div class="intro-label">設定</div>
+      <div class="intro-body">
+        右上の歯車アイコンから、カラーパレット・背景・反復回数・配色の細かさを調整できます。
+      </div>
+    </div>
+    <div class="intro-section">
+      <div class="intro-label">配色の周期</div>
+      <div class="intro-body">
+        色がどのくらいの間隔で繰り返すかを調整します。「細かい」にするとカラフルで模様がくっきり見える一方、複雑な部分ではノイズっぽく見えることがあります。「なめらか」にすると色の変化が緩やかになり、深く拡大したときにチラつきにくくなります。
+      </div>
+    </div>
+    <div class="intro-section">
+      <div class="intro-label">反復回数</div>
+      <div class="intro-body">
+        1つの点がマンデルブロ集合に含まれるかどうかを判定するための計算回数です。多いほど模様が精細になりますが、その分計算が重くなります。深く拡大するほど自動的に多くなるように調整されていますが、動作が重いと感じたら「低」側に、模様がぼやけると感じたら「高」側に動かしてみてください。
+      </div>
+    </div>
+    <div id="introFooter">
+      <label class="intro-checkbox-row">
+        <input type="checkbox" id="introDontShow">
+        <span>次回からこの説明を表示しない</span>
+      </label>
+      <button id="introCloseBtn">はじめる</button>
+    </div>
+  </div>
+</div>
 
 <script>
 (function() {
@@ -289,7 +429,7 @@ vec3 palette(float t, int id) {
     vec3 a=vec3(0.01,0.02,0.08), b=vec3(0.05,0.35,0.65), c=vec3(0.75,0.95,1.0);
     return t<0.5 ? mix(a,b,t/0.5) : mix(b,c,(t-0.5)/0.5);
   } else if (id == 3) {
-    return mix(vec3(0.02), vec3(0.85,0.65,0.20), t);
+    return mix(vec3(0.02), vec3(1.0), t);
   } else {
     vec3 a=vec3(0.03,0.0,0.08), b=vec3(0.55,0.15,0.75), c=vec3(1.0,0.75,0.90);
     return t<0.5 ? mix(a,b,t/0.5) : mix(b,c,(t-0.5)/0.5);
@@ -362,7 +502,7 @@ void main() {
 
   vec3 col;
   if (!escaped) {
-    col = uBgMode == 0 ? vec3(0.0) : vec3(0.05, 0.04, 0.06);
+    col = uBgMode == 0 ? vec3(0.0) : vec3(1.0);
   } else {
     // sqrt compresses the iteration axis so that deep regions, where
     // neighbouring pixels can differ by tens of iterations, do not turn
@@ -404,7 +544,7 @@ void main() {
     z = vec2(x2 - y2, 2.0*z.x*z.y) + c;
   }
   vec3 col;
-  if (!escaped) col = uBgMode == 0 ? vec3(0.0) : vec3(0.05,0.04,0.06);
+  if (!escaped) col = uBgMode == 0 ? vec3(0.0) : vec3(1.0);
   else {
     col = palette(sqrt(max(smoothIter,0.0)) * uColorRate + uColorPhase, uPaletteId);
     col = pow(col, vec3(0.92));
@@ -676,6 +816,7 @@ function zoomAt(px, py, factor) {
 const hideHint = () => document.getElementById('hint').classList.add('fade');
 
 canvas.addEventListener('mousedown', (e) => {
+  if (panel.classList.contains('open')) return;
   dragging = true; lastX = e.clientX; lastY = e.clientY;
   canvas.classList.add('dragging');
 });
@@ -690,6 +831,7 @@ window.addEventListener('mouseup', () => {
   if (dragging) { dragging = false; canvas.classList.remove('dragging'); scheduleRender(false); }
 });
 canvas.addEventListener('wheel', (e) => {
+  if (panel.classList.contains('open')) return;
   e.preventDefault();
   const dpr = canvas.width / window.innerWidth;
   zoomAt(e.clientX * dpr, e.clientY * dpr, Math.exp(e.deltaY * 0.0016));
@@ -698,6 +840,7 @@ canvas.addEventListener('wheel', (e) => {
 
 let touch = null;
 canvas.addEventListener('touchstart', (e) => {
+  if (panel.classList.contains('open')) return;
   hideHint();
   if (e.touches.length === 1) {
     touch = { mode:'pan', x:e.touches[0].clientX, y:e.touches[0].clientY };
@@ -744,7 +887,7 @@ const PALETTES = [
   { id:0, css:'linear-gradient(135deg,#ff3b3b,#ffd93b,#3bff88,#3bb8ff,#a23bff)' },
   { id:1, css:'linear-gradient(135deg,#1a0800,#ff8c1a,#fff0a0)' },
   { id:2, css:'linear-gradient(135deg,#020410,#0d59a6,#bff5ff)' },
-  { id:3, css:'linear-gradient(135deg,#111,#d9a441)' },
+  { id:3, css:'linear-gradient(135deg,#111,#ffffff)' },
   { id:4, css:'linear-gradient(135deg,#0a0014,#8c26bf,#ffc0e0)' },
 ];
 const swatches = document.getElementById('paletteSwatches');
@@ -803,8 +946,14 @@ document.getElementById('resetBtn').addEventListener('click', () => {
 
 const panelToggle = document.getElementById('panelToggle');
 const panel = document.getElementById('panel');
-panelToggle.addEventListener('click', (e) => { e.stopPropagation(); panel.classList.toggle('open'); });
-document.addEventListener('click', (e) => {
+panelToggle.addEventListener('pointerdown', (e) => { e.stopPropagation(); panel.classList.toggle('open'); });
+
+// Close on any tap/click outside the panel. `pointerdown` fires reliably
+// on both mouse and touch — unlike `click`, which can be swallowed by the
+// canvas's own touchstart/mousedown handlers (preventDefault on touch
+// suppresses the synthesized click; a mouse drag that starts on canvas
+// doesn't cleanly produce one either).
+document.addEventListener('pointerdown', (e) => {
   if (panel.classList.contains('open') && !panel.contains(e.target) && !panelToggle.contains(e.target)) {
     panel.classList.remove('open');
   }
@@ -912,6 +1061,36 @@ azBtn.addEventListener('click', (e) => {
 });
 
 // =====================================================================
+// Intro modal — shown on first visit, re-openable from settings, with
+// an opt-out saved locally so it doesn't nag on repeat visits.
+// =====================================================================
+const INTRO_KEY = 'mandelbrot_hide_intro';
+const introOverlay = document.getElementById('introOverlay');
+const introDontShow = document.getElementById('introDontShow');
+const introCloseBtn = document.getElementById('introCloseBtn');
+const helpBtn = document.getElementById('helpBtn');
+
+function openIntro() {
+  introOverlay.classList.add('show');
+}
+function closeIntro() {
+  introOverlay.classList.remove('show');
+  try {
+    if (introDontShow.checked) localStorage.setItem(INTRO_KEY, '1');
+  } catch (e) { /* storage unavailable — just skip persisting the choice */ }
+}
+introCloseBtn.addEventListener('click', closeIntro);
+introOverlay.addEventListener('click', (e) => { if (e.target === introOverlay) closeIntro(); });
+helpBtn.addEventListener('click', (e) => {
+  e.stopPropagation();
+  panel.classList.remove('open');
+  openIntro();
+});
+
+let seenBefore = false;
+try { seenBefore = localStorage.getItem(INTRO_KEY) === '1'; } catch (e) { /* ignore */ }
+
+// =====================================================================
 // Boot
 // =====================================================================
 resizeIfNeeded();
@@ -919,6 +1098,7 @@ loading.style.opacity = '0';
 setTimeout(() => { loading.style.display = 'none'; }, 400);
 scheduleRender(false);
 setTimeout(hideHint, 5000);
+if (!seenBefore) openIntro();
 
 })();
 </script>
